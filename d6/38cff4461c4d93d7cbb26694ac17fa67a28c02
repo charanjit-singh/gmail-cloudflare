@@ -1,0 +1,63 @@
+SETUP.md
+  s_83d40e3169d15c::t_8e582e963bcf79 81-116
+addon/Code.gs
+  s_83d40e3169d15c::t_55ca284d85170b 6,67-68,90,96-97,152-156,161,163-164,167-168,171,173-174,176-186,188,190,195-196,199,202,211,215-216,218-260,313,316-317,325,327,329,331-332
+addon/appsscript.json
+  s_83d40e3169d15c::t_df507803a606f7 12-13,18,41-49
+extension/.gitignore
+  s_83d40e3169d15c::t_77c0387f93fdc7 1-2
+extension/build.mjs
+  s_83d40e3169d15c::t_6d2aee0d839643 1-24
+extension/package-lock.json
+  s_83d40e3169d15c::t_c559e760f4cf83 1-1127
+extension/package.json
+  s_83d40e3169d15c::t_60a5f96cf6147c 1-16
+extension/src/archive-page.js
+  s_83d40e3169d15c::t_2109948672ebf1 1-88
+extension/src/background.js
+  s_83d40e3169d15c::t_097e058cb3a7f6 1-29
+extension/src/compose-button.js
+  s_83d40e3169d15c::t_9e918b95fcf8fa 1-81
+extension/src/content.js
+  s_83d40e3169d15c::t_3d5ff523c61973 1-15
+extension/src/options.js
+  s_83d40e3169d15c::t_da50326dad6afe 1-36
+extension/src/shared.js
+  s_83d40e3169d15c::t_e08b9320ef12c1 1-23
+extension/static/manifest.json
+  s_83d40e3169d15c::t_dd82aaaca459a4 1-24
+extension/static/options.html
+  s_83d40e3169d15c::t_5ec2061eef5f76 1-32
+package.json
+  s_83d40e3169d15c::t_fb60c745fea41e 12-13
+public/app.js
+  s_83d40e3169d15c::t_414bb0126f400d 42,121-179
+public/cloudflare.svg
+  s_83d40e3169d15c::t_846958d08e0e21 1
+public/index.html
+  s_83d40e3169d15c::t_3ae01d0af0242f 23-32,38,49-61
+schema.sql
+  s_83d40e3169d15c::t_f4d80df9e2afc2 1-19
+scripts/build-logo.mjs
+  s_83d40e3169d15c::t_0e30e82670750d 1-11
+src/index.js
+  s_83d40e3169d15c::t_a129ca32ef70cb 1-2,49-85,92,157-159,171,174-182
+src/mail-store.js
+  s_83d40e3169d15c::t_ba83741a7d95a0 1-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d638cff4461c4d93d7cbb26694ac17fa67a28c02",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
