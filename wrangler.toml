@@ -13,5 +13,4 @@ DEFAULT_DESTINATION = "abcd@gmail.com"
 
 # Secrets (set with `wrangler secret put <NAME>`):
 #   ADMIN_PASSWORD      - password for the dashboard and the Gmail extension
-#   CF_API_TOKEN        - Cloudflare API token (see README for permissions)
-#   RESEND_API_KEY      - optional, only needed for sending from your domain
+#   CF_API_TOKEN        - Cloudflare API token (receiving + sending, see README)
