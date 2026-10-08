@@ -108,12 +108,12 @@ async function route(request, env, url) {
 
   if (p === "/api/send" && m === "POST") {
     if (!env.RESEND_API_KEY) return json({ error: "RESEND_API_KEY is not configured" }, 501);
-    const { from, to, cc, bcc, subject, text, html, replyTo } = await request.json();
+    const { from, to, cc, bcc, subject, text, html, replyTo, attachments } = await request.json();
     if (!from || !to?.length || !subject) return json({ error: "from, to and subject are required" }, 400);
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-      body: JSON.stringify({ from, to, cc, bcc, subject, text, html, reply_to: replyTo || from }),
+      body: JSON.stringify({ from, to, cc, bcc, subject, text, html, reply_to: replyTo || from, attachments: attachments?.length ? attachments : undefined }),
     });
     const body = await res.json().catch(() => ({}));
     return json(res.ok ? { ok: true, id: body.id } : { error: body.message || "Send failed" }, res.ok ? 200 : 502);

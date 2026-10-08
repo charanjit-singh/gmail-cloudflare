@@ -7,10 +7,40 @@ function onHome() {
   return props().getProperty("WORKER_URL") ? composeCard({}) : settingsCard();
 }
 
-// Opened from the compose window: prefill recipients from the draft.
-function onCompose(e) {
-  const d = (e && e.draftMetadata) || {};
-  return composeCard({ to: (d.toRecipients || []).join(", "), cc: (d.ccRecipients || []).join(", ") });
+// Opened from the compose window: a second "Send" button that sends the open draft from the alias.
+function onCompose() {
+  return CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader().setTitle("Send as alias"))
+    .addSection(CardService.newCardSection()
+      .addWidget(CardService.newTextParagraph().setText(
+        "Sends your current draft from <b>" + (props().getProperty("FROM_ADDRESS") || "not set") +
+        "</b> and removes it from Drafts. Wait a few seconds after typing so Gmail can auto-save."))
+      .addWidget(CardService.newTextButton().setText("Send via custom domain")
+        .setOnClickAction(CardService.newAction().setFunctionName("sendDraft")))
+      .addWidget(CardService.newTextButton().setText("Settings")
+        .setOnClickAction(CardService.newAction().setFunctionName("openSettings"))))
+    .build();
+}
+
+function sendDraft(e) {
+  const draft = GmailApp.getDrafts().sort((x, y) => y.getMessage().getDate() - x.getMessage().getDate())[0];
+  if (!draft) return notify("No draft found. Wait for Gmail to auto-save, then try again.");
+  const m = draft.getMessage();
+  const err = post({
+    to: list(m.getTo()),
+    cc: list(m.getCc()),
+    bcc: list(m.getBcc()),
+    subject: m.getSubject(),
+    text: m.getPlainBody(),
+    html: m.getBody(),
+    attachments: m.getAttachments().map((a) => ({
+      filename: a.getName(),
+      content: Utilities.base64Encode(a.getBytes()),
+    })),
+  });
+  if (err) return notify("Send failed: " + err);
+  draft.deleteDraft();
+  return notify("Sent from " + props().getProperty("FROM_ADDRESS"), true);
 }
 
 // Opened on a message: reply to the sender from the alias.
@@ -73,30 +103,26 @@ function saveSettings(e) {
 
 const list = (s) => (s || "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
 
-function send(e) {
-  const f = e.formInput;
+// Posts to the Worker. Returns an error string, or null on success.
+function post(payload) {
   const p = props().getProperties();
-  if (!p.WORKER_URL || !p.FROM_ADDRESS) return notify("Open Settings first.");
-  if (!list(f.to).length) return notify("Add a recipient.");
+  if (!p.WORKER_URL || !p.FROM_ADDRESS) return "Open Settings first.";
+  if (!payload.to.length) return "Add a recipient.";
   const res = UrlFetchApp.fetch(p.WORKER_URL + "/api/send", {
     method: "post",
     contentType: "application/json",
     headers: { Authorization: "Bearer " + p.ADMIN_PASSWORD },
     muteHttpExceptions: true,
-    payload: JSON.stringify({
-      from: p.FROM_ADDRESS,
-      to: list(f.to),
-      cc: list(f.cc),
-      subject: f.subject || "",
-      text: f.body || "",
-    }),
+    payload: JSON.stringify(Object.assign({ from: p.FROM_ADDRESS }, payload)),
   });
-  if (res.getResponseCode() !== 200) {
-    let err = "HTTP " + res.getResponseCode();
-    try { err = JSON.parse(res.getContentText()).error || err; } catch (x) {}
-    return notify("Send failed: " + err);
-  }
-  return notify("Sent from " + p.FROM_ADDRESS, true);
+  if (res.getResponseCode() === 200) return null;
+  try { return JSON.parse(res.getContentText()).error; } catch (x) { return "HTTP " + res.getResponseCode(); }
+}
+
+function send(e) {
+  const f = e.formInput;
+  const err = post({ to: list(f.to), cc: list(f.cc), subject: f.subject || "", text: f.body || "" });
+  return err ? notify("Send failed: " + err) : notify("Sent from " + props().getProperty("FROM_ADDRESS"), true);
 }
 
 function notify(text, pop) {
