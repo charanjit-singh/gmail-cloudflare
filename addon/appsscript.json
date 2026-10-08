@@ -10,7 +10,9 @@
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/script.external_request",
     "https://www.googleapis.com/auth/script.locale",
-    "https://www.googleapis.com/auth/gmail.insert"
+    "https://www.googleapis.com/auth/gmail.insert",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.settings.basic"
   ],
   "addOns": {
     "common": {

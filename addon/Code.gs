@@ -57,7 +57,65 @@ function syncAccounts() {
     return uploaded.status === 200 ? uploaded.body : { error: uploaded.body.error };
   }
   props().setProperty("FROM_ADDRESSES", remote.body.accounts.map((account) => account.value).join("\n"));
-  return remote.body;
+  const labelError = labelsNeedSetup(remote.body.receivingDomains) ? setupDomainLabels(remote.body.receivingDomains) : null;
+  return Object.assign({ labelError }, remote.body);
+}
+
+// ---------- Domain labels ----------
+
+// Gmail only accepts colours from its own palette.
+const LABEL_COLORS = ["#4a86e8", "#16a766", "#ffad47", "#a479e2", "#f691b3", "#2da2bb"];
+const BACKFILL_LIMIT = 500;
+
+const domainLabelIds = () => JSON.parse(props().getProperty("DOMAIN_LABELS") || "{}");
+
+function createDomainLabel(domain, index) {
+  const label = { name: domain, labelListVisibility: "labelShow", messageListVisibility: "show" };
+  try {
+    return Gmail.Users.Labels.create(
+      Object.assign({ color: { backgroundColor: LABEL_COLORS[index % LABEL_COLORS.length], textColor: "#ffffff" } }, label),
+      "me"
+    );
+  } catch (error) {
+    console.error("Label colour rejected, creating without colour: " + error);
+    return Gmail.Users.Labels.create(label, "me");
+  }
+}
+
+function ensureDomainFilter(domain, labelId, filters) {
+  const query = "to:@" + domain;
+  const exists = filters.some((filter) => filter.criteria && filter.criteria.query === query && (filter.action.addLabelIds || []).indexOf(labelId) >= 0);
+  if (!exists) Gmail.Users.Settings.Filters.create({ criteria: { query }, action: { addLabelIds: [labelId] } }, "me");
+}
+
+function labelExistingMail(domain, labelId) {
+  const found = Gmail.Users.Messages.list("me", { q: "to:@" + domain + " OR from:@" + domain, maxResults: BACKFILL_LIMIT });
+  const ids = (found.messages || []).map((message) => message.id);
+  if (ids.length) Gmail.Users.Messages.batchModify({ ids, addLabelIds: [labelId] }, "me");
+}
+
+// Gives every receiving domain a Gmail label and a filter, and labels mail already in the inbox. Returns an error string or null.
+function setupDomainLabels(domains) {
+  try {
+    const labels = Gmail.Users.Labels.list("me").labels || [];
+    const filters = Gmail.Users.Settings.Filters.list("me").filter || [];
+    const ids = {};
+    domains.forEach((domain, index) => {
+      const label = labels.find((existing) => existing.name === domain) || createDomainLabel(domain, index);
+      ids[domain] = label.id;
+      ensureDomainFilter(domain, label.id, filters);
+      labelExistingMail(domain, label.id);
+    });
+    props().setProperty("DOMAIN_LABELS", JSON.stringify(ids));
+    return null;
+  } catch (error) {
+    console.error("Could not set up domain labels: " + error);
+    return String(error.message || error);
+  }
+}
+
+function labelsNeedSetup(domains) {
+  return Boolean(domains) && Object.keys(domainLabelIds()).sort().join(",") !== domains.slice().sort().join(",");
 }
 
 function chosenFrom(formInput) {
@@ -168,7 +226,7 @@ function send(e) {
   const payload = { to: list(form.to), cc: list(form.cc), subject: form.subject || "", text: form.body || "" };
   const result = post(from, payload);
   if (result.error) return notify("Send failed: " + result.error);
-  const copyError = saveSentCopy(buildRaw(from, payload, result.messageId));
+  const copyError = saveSentCopy(buildRaw(from, payload, result.messageId), from);
   return notify(copyError ? "Sent, but not copied to Sent: " + copyError : "Sent!", true);
 }
 
@@ -230,7 +288,7 @@ function deliverDraft(draft, from) {
     })),
   });
   if (result.error) return resultCard("Could not send", result.error, false);
-  const copyError = saveSentCopy(rawWithSender(message.getRawContent(), from, result.messageId));
+  const copyError = saveSentCopy(rawWithSender(message.getRawContent(), from, result.messageId), from);
   draft.deleteDraft();
   const detail = "From " + labelFor(from) + "\nTo " + (message.getTo() || "recipient");
   return resultCard("Sent!", copyError ? detail + "\nNot copied to Sent: " + copyError : detail, true);
@@ -267,9 +325,11 @@ function buildRaw(from, payload, messageId) {
 }
 
 // Puts a copy of the sent mail in Gmail's Sent folder. Returns an error string, or null.
-function saveSentCopy(raw) {
+function saveSentCopy(raw, from) {
+  const email = (from.match(EMAIL_PATTERN) || [""])[0];
+  const domainLabel = domainLabelIds()[(email.split("@")[1] || "").toLowerCase()];
   try {
-    Gmail.Users.Messages.insert({ raw: Utilities.base64EncodeWebSafe(raw), labelIds: ["SENT"] }, "me");
+    Gmail.Users.Messages.insert({ raw: Utilities.base64EncodeWebSafe(raw), labelIds: domainLabel ? ["SENT", domainLabel] : ["SENT"] }, "me");
     return null;
   } catch (error) {
     console.error("Could not save the sent copy: " + error);
@@ -321,10 +381,13 @@ function saveSettings(e) {
     ADMIN_PASSWORD: (form.ADMIN_PASSWORD || "").trim(),
   });
   props().deleteProperty("FROM_ADDRESS");
+  props().deleteProperty("DOMAIN_LABELS");
   const synced = syncAccounts();
   if (synced.error) return notify(synced.error);
   const count = synced.accounts.length;
-  return notify("Connected. " + count + " account" + (count === 1 ? "" : "s") + " loaded.", true);
+  const loaded = "Connected. " + count + " account" + (count === 1 ? "" : "s") + " loaded";
+  if (synced.labelError) return notify(loaded + ", but domain labels failed: " + synced.labelError);
+  return notify(loaded + ", domain labels ready.", true);
 }
 
 // ---------- Worker ----------

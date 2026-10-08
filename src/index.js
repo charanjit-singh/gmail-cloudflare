@@ -100,7 +100,9 @@ async function route(request, env, url) {
 
   if (p === "/api/accounts" && m === "GET") {
     const [saved, zones] = await Promise.all([getAccounts(env), cf(env, "/zones?per_page=50")]);
-    return json({ ...saved, domains: zones.map((zone) => zone.name.toLowerCase()) });
+    const routing = await Promise.all(zones.map((zone) => cf(env, `/zones/${zone.id}/email/routing`).catch(() => null)));
+    const receivingDomains = zones.filter((zone, index) => routing[index]?.enabled).map((zone) => zone.name.toLowerCase());
+    return json({ ...saved, domains: zones.map((zone) => zone.name.toLowerCase()), receivingDomains });
   }
 
   if (p === "/api/accounts" && m === "PUT") {
