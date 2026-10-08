@@ -1,0 +1,31 @@
+addon/Code.gs
+  s_83d40e3169d15c::t_6f5ab902ff1204 2-3,48-75,133,139,192,300,331,333-336,338
+extension/src/background.js
+  s_83d40e3169d15c::t_b183e9601f25ec 19-32,38-41
+extension/src/compose-button.js
+  s_83d40e3169d15c::t_456ecb0818c4f6 27,88
+extension/src/options.js
+  s_83d40e3169d15c::t_c8612f77b650ec 9,16,18-19,21-30,34
+schema.sql
+  s_83d40e3169d15c::t_82d1f056ab0307 20-25
+src/index.js
+  s_83d40e3169d15c::t_d8915c650e9f76 2,101-114
+src/settings-store.js
+  s_83d40e3169d15c::t_529781a39f57a4 1-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "737cf33e58aeac0ecf566c6bba4226c11a153d7a",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
