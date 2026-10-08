@@ -100,7 +100,7 @@ Without the binding, sending still works and nothing is saved. The `mail` table 
 
 ## Chrome extension (optional)
 
-The extension adds a **Send as alias** button to Gmail's compose window (pick an account, tap, sent) and a **Sent as alias** page in the left menu. It uses [InboxSDK](https://github.com/InboxSDK/InboxSDK).
+No library or app ID needed. The extension adds a **Send as alias** button next to Send in Gmail's compose window (pick an account, tap, sent). Click the extension's toolbar icon to open your sent-mail archive in a new tab.
 
 ```
 cd extension
@@ -109,10 +109,10 @@ npm run build
 ```
 
 1. Open `chrome://extensions`, turn on Developer mode, choose **Load unpacked** and pick `extension/dist`.
-2. Open the extension's settings and enter the Worker URL, admin password and From addresses (`Name · address@yourdomain.com`, one per line). **Test connection** checks the domains.
-3. Optional: register a free app ID at [register.inboxsdk.com](https://register.inboxsdk.com) and paste it into settings.
+2. Open the extension's options and enter the Worker URL, admin password and From addresses (`Name · address@yourdomain.com`, one per line). **Test connection** checks the domains.
+3. Reload Gmail.
 
-Limits: the compose button sends text and HTML only. For messages with attachments, use the add-on's **Send via custom domain** action.
+Limits: the button finds Gmail's compose window by its page structure, so a Gmail redesign can break it. It sends text and HTML only; for messages with attachments use the add-on's **Send via custom domain** action.
 
 ## Local development
 

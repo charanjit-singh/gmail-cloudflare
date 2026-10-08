@@ -3,22 +3,35 @@
   "name": "Send as alias for Gmail",
   "description": "Send from your own domain addresses in Gmail and browse everything you sent as an alias.",
   "version": "0.1.0",
-  "icons": { "128": "icon.png" },
+  "icons": {
+    "128": "icon.png"
+  },
   "content_scripts": [
     {
-      "matches": ["https://mail.google.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://mail.google.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_end"
     }
   ],
-  "background": { "service_worker": "background.js" },
-  "options_ui": { "page": "options.html", "open_in_tab": true },
-  "permissions": ["scripting", "storage"],
-  "host_permissions": ["https://mail.google.com/"],
-  "web_accessible_resources": [
-    {
-      "resources": ["icon.png", "*.map"],
-      "matches": ["https://mail.google.com/*"]
-    }
-  ]
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "permissions": [
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://mail.google.com/"
+  ],
+  "action": {
+    "default_title": "Sent as alias"
+  }
 }

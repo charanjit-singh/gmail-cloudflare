@@ -13,7 +13,7 @@ export const identitiesFrom = (text) =>
   (text || "").split("\n").map((line) => line.trim()).filter(Boolean).map(parseIdentity).filter(Boolean);
 
 export const loadSettings = () =>
-  chrome.storage.local.get({ workerUrl: "", password: "", addresses: "", appId: "", lastFrom: "" });
+  chrome.storage.local.get({ workerUrl: "", password: "", addresses: "", lastFrom: "" });
 
 export function api(path, method = "GET", body) {
   return chrome.runtime.sendMessage({ type: "api", path, method, body });

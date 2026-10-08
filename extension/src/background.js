@@ -1,5 +1,3 @@
-import "@inboxsdk/core/background.js";
-
 async function callWorker({ path, method, body }) {
   const { workerUrl, password } = await chrome.storage.local.get({ workerUrl: "", password: "" });
   if (!workerUrl || !password) {
@@ -23,7 +21,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     callWorker(message).then(sendResponse);
     return true;
   }
-  if (message?.type === "open-options") {
-    chrome.runtime.openOptionsPage();
-  }
+  if (message?.type === "open-options") chrome.runtime.openOptionsPage();
+  if (message?.type === "open-archive") chrome.tabs.create({ url: chrome.runtime.getURL("archive.html") });
 });
+
+chrome.action.onClicked.addListener(() => chrome.tabs.create({ url: chrome.runtime.getURL("archive.html") }));

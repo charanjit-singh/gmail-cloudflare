@@ -1,7 +1,7 @@
 import { api, identitiesFrom, loadSettings } from "./shared.js";
 
 const $ = (id) => document.getElementById(id);
-const fields = ["workerUrl", "password", "addresses", "appId"];
+const fields = ["workerUrl", "password", "addresses"];
 
 const say = (text) => ($("status").textContent = text);
 
@@ -17,7 +17,7 @@ async function save() {
     return say("Each From address line needs an email address, like BN Habitat · hello@bnhabitat.com");
   }
   await chrome.storage.local.set({ ...values, workerUrl: values.workerUrl.replace(/\/$/, "") });
-  say("Saved. Reload Gmail to apply a new InboxSDK app ID.");
+  say("Saved.");
 }
 
 async function testConnection() {

@@ -1,7 +1,5 @@
 import { api, escapeHtml } from "./shared.js";
 
-const ROUTE_ID = "alias-archive";
-
 const styles = `
 .saa { max-width:860px; margin:0 auto; padding:16px; font:14px/1.5 system-ui,sans-serif; color:#202124 }
 .saa h2 { font-size:20px; margin:0 0 12px }
@@ -21,21 +19,12 @@ const styles = `
 const when = (ms) => new Date(ms).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 const recipients = (list) => (list.length ? list.join(", ") : "no recipient");
 
-export function registerArchivePage(sdk) {
-  sdk.NavMenu.addNavItem({
-    name: "Sent as alias",
-    iconUrl: chrome.runtime.getURL("icon.png"),
-    routeID: ROUTE_ID,
-  });
-  sdk.Router.handleCustomRoute(ROUTE_ID, (routeView) => showList(routeView.getElement()));
-}
-
 function shell(container, body) {
   container.innerHTML = `<style>${styles}</style><div class="saa">${body}</div>`;
   return container.querySelector(".saa");
 }
 
-async function showList(container, query = "", before = null, appendTo = null) {
+export async function showList(container, query = "", before = null, appendTo = null) {
   const params = new URLSearchParams({ direction: "sent" });
   if (query) params.set("q", query);
   if (before) params.set("before", before);
@@ -86,3 +75,4 @@ async function showMail(container, id, query) {
   if (mail.html_body) view.querySelector("iframe").srcdoc = mail.html_body;
   view.querySelector(".back").addEventListener("click", () => showList(container, query));
 }
+

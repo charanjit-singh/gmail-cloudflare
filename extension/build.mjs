@@ -7,10 +7,9 @@ await rm("dist", { recursive: true, force: true });
 await mkdir("dist", { recursive: true });
 await cp("static", "dist", { recursive: true });
 await cp("../docs/logo.png", "dist/icon.png");
-await cp("node_modules/@inboxsdk/core/pageWorld.js", "dist/pageWorld.js");
 
 const options = {
-  entryPoints: { content: "src/content.js", background: "src/background.js", options: "src/options.js" },
+  entryPoints: { content: "src/content.js", background: "src/background.js", options: "src/options.js", archive: "src/archive.js" },
   outdir: "dist",
   bundle: true,
   format: "iife",
