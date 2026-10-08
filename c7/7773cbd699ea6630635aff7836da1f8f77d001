@@ -1,0 +1,19 @@
+addon/Code.gs
+  s_83d40e3169d15c::t_92e4045c3f7b92 1-2,5-6,8,10-14,18-77,80-95,98-106,109-124,126-131,135-161,163-166,170-196,198-223,227,229-230,232-237,241,244,246,248,253,255-260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c77773cbd699ea6630635aff7836da1f8f77d001",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
