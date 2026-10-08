@@ -107,9 +107,11 @@ function setupDomainLabels(domains) {
       labelExistingMail(domain, label.id);
     });
     props().setProperty("DOMAIN_LABELS", JSON.stringify(ids));
+    props().deleteProperty("LABEL_ERROR");
     return null;
   } catch (error) {
     console.error("Could not set up domain labels: " + error);
+    props().setProperty("LABEL_ERROR", String(error.message || error));
     return String(error.message || error);
   }
 }
@@ -352,7 +354,7 @@ function settingsCard() {
     .addWidget(textInput("ADMIN_PASSWORD", "Admin password", p.getProperty("ADMIN_PASSWORD")))
     .addWidget(note("That's all you need. Accounts load from your Worker."));
   const card = CardService.newCardBuilder().setHeader(header("Settings")).addSection(connection);
-  if (synced) card.addSection(accountsSection(synced));
+  if (synced) card.addSection(accountsSection(synced)).addSection(labelsSection());
   const footer = CardService.newFixedFooter().setPrimaryButton(filledButton("Save", action("saveSettings")));
   if (p.getProperty("WORKER_URL")) {
     footer.setSecondaryButton(
@@ -372,6 +374,15 @@ function accountsSection(synced) {
     );
   });
   return section;
+}
+
+function labelsSection() {
+  const section = CardService.newCardSection().setHeader("Domain labels");
+  const ready = Object.keys(domainLabelIds());
+  const error = props().getProperty("LABEL_ERROR");
+  if (error) return section.addWidget(note("Couldn't set up labels: " + plain(error)));
+  if (!ready.length) return section.addWidget(note("Not set up yet. Press Save to create them."));
+  return section.addWidget(note("Ready: " + ready.join(", ")));
 }
 
 function saveSettings(e) {
