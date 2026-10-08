@@ -39,6 +39,7 @@ async function init() {
   $("zone").innerHTML = zones.map((z) => `<option value="${z.id}">${esc(z.name)}</option>`).join("");
   await loadDestinations();
   await loadZone();
+  if (config.canStoreMail) await showMailCard();
 }
 
 async function loadDestinations() {
@@ -117,3 +118,62 @@ $("rules").onclick = run(async (e) => {
 });
 
 init().catch((e) => { if (e.message !== "Unauthorized") toast(e.message); });
+
+// ---------- Sent mail ----------
+
+let mailNext = null;
+
+const when = (ms) => new Date(ms).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+const recipients = (list) => (list.length ? list.join(", ") : "no recipient");
+
+async function showMailCard() {
+  $("mailCard").hidden = false;
+  await loadMail(true);
+}
+
+async function loadMail(reset) {
+  if (reset) mailNext = null;
+  const query = new URLSearchParams({ direction: "sent" });
+  if ($("mailSearch").value.trim()) query.set("q", $("mailSearch").value.trim());
+  if (!reset && mailNext) query.set("before", mailNext);
+  const page = await api("/mail?" + query);
+  const rows = page.items.map((mail) =>
+    `<button class="mail-row" data-mail="${esc(mail.id)}"><div class="top"><span class="subject">${esc(mail.subject || "(no subject)")}</span>` +
+    `<span class="when">${esc(when(mail.created_at))}</span></div>` +
+    `<div class="mute">${esc(mail.from_address)} to ${esc(recipients(mail.to_addresses))}</div>` +
+    `<div class="mute">${esc(mail.preview || "")}</div></button>`
+  ).join("");
+  $("mailRows").innerHTML = reset ? rows || '<div class="mute">No sent mail yet.</div>' : $("mailRows").innerHTML + rows;
+  mailNext = page.next;
+  $("mailMore").hidden = !mailNext;
+}
+
+async function openMail(id) {
+  const mail = await api("/mail/" + id);
+  const files = mail.attachments.map((file) => `${esc(file.filename)} (${Math.max(1, Math.round(file.size / 1024))} KB)`).join(", ");
+  const body = mail.html_body
+    ? '<iframe class="mail-frame" sandbox="" referrerpolicy="no-referrer"></iframe>'
+    : `<pre class="mail-text">${esc(mail.text_body || "")}</pre>`;
+  $("mailView").innerHTML =
+    `<div class="row"><button id="mailBack">Back to list</button></div><h3>${esc(mail.subject || "(no subject)")}</h3>` +
+    `<dl><dt>From</dt><dd>${esc(mail.from_address)}</dd><dt>To</dt><dd>${esc(recipients(mail.to_addresses))}</dd>` +
+    (mail.cc_addresses.length ? `<dt>Cc</dt><dd>${esc(mail.cc_addresses.join(", "))}</dd>` : "") +
+    (mail.bcc_addresses.length ? `<dt>Bcc</dt><dd>${esc(mail.bcc_addresses.join(", "))}</dd>` : "") +
+    `<dt>Sent</dt><dd>${esc(when(mail.created_at))}</dd>` + (files ? `<dt>Files</dt><dd>${files}</dd>` : "") + `</dl>` + body;
+  if (mail.html_body) $("mailView").querySelector("iframe").srcdoc = mail.html_body;
+  $("mailList").hidden = true;
+  $("mailView").hidden = false;
+}
+
+$("mailRows").addEventListener("click", run((event) => {
+  const row = event.target.closest("[data-mail]");
+  return row && openMail(row.dataset.mail);
+}));
+$("mailView").addEventListener("click", (event) => {
+  if (!event.target.closest("#mailBack")) return;
+  $("mailView").hidden = true;
+  $("mailList").hidden = false;
+});
+$("mailSearchBtn").addEventListener("click", run(() => loadMail(true)));
+$("mailSearch").addEventListener("keydown", run((event) => event.key === "Enter" && loadMail(true)));
+$("mailMore").addEventListener("click", run(() => loadMail(false)));

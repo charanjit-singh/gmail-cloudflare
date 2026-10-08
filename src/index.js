@@ -1,3 +1,5 @@
+import { saveSentMail, listMail, getMail } from "./mail-store.js";
+
 const CF = "https://api.cloudflare.com/client/v4";
 
 const json = (data, status = 200, extra = {}) =>
@@ -44,13 +46,50 @@ const forwardRule = (name, match, dests) => ({
   actions: [{ type: "forward", value: dests }],
 });
 
+const MAX_MESSAGE_BYTES = 5 * 1024 * 1024;
+const BASE64_BYTES_PER_CHAR = 3 / 4;
+const MIME_BY_EXTENSION = {
+  pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+  webp: "image/webp", txt: "text/plain", csv: "text/csv", html: "text/html", json: "application/json",
+  zip: "application/zip", doc: "application/msword", xls: "application/vnd.ms-excel",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+// Cloudflare needs content, filename, type and disposition on every attachment.
+function cloudflareAttachments(attachments) {
+  return (attachments || []).map((file) => {
+    const extension = (file.filename.split(".").pop() || "").toLowerCase();
+    return {
+      content: file.content,
+      filename: file.filename,
+      type: file.type || file.contentType || MIME_BY_EXTENSION[extension] || "application/octet-stream",
+      disposition: file.disposition || "attachment",
+    };
+  });
+}
+
+const attachmentBytes = (attachments) =>
+  (attachments || []).reduce((total, file) => total + Math.floor((file.content || "").length * BASE64_BYTES_PER_CHAR), 0);
+
+// The mail has already been sent, so a failed save is reported to the caller instead of failing the send.
+async function recordSentMail(env, mail) {
+  if (!env.DB) return { stored: false, storeError: "D1 is not set up" };
+  try {
+    return { stored: true, mailId: await saveSentMail(env, mail) };
+  } catch (error) {
+    console.error("Could not save sent mail: " + error.message);
+    return { stored: false, storeError: error.message };
+  }
+}
+
 async function route(request, env, url) {
   const { pathname: p } = url;
   const m = request.method;
   let parts;
 
   if (p === "/api/config" && m === "GET") {
-    return json({ defaultDestination: env.DEFAULT_DESTINATION, canSend: true });
+    return json({ defaultDestination: env.DEFAULT_DESTINATION, canSend: true, canStoreMail: Boolean(env.DB) });
   }
 
   if (p === "/api/zones" && m === "GET") {
@@ -115,6 +154,9 @@ async function route(request, env, url) {
     const { from, to, cc, bcc, subject, text, html, replyTo, attachments } = await request.json();
     if (!from || !to?.length || !subject) return json({ error: "from, to and subject are required" }, 400);
     if (!text?.trim() && !html?.trim()) return json({ error: "Message is empty. Type something in the Message box and send again." }, 400);
+    if (attachmentBytes(attachments) > MAX_MESSAGE_BYTES) {
+      return json({ error: "Attachments are over 5 MB in total. Send smaller files or share a link." }, 413);
+    }
     const [, name, addr] = from.match(/^\s*(?:"?([^"<]*?)"?\s*)?<([^>]+)>\s*$/) || [, "", from.trim()];
     const domain = addr.split("@")[1];
     const [zone] = await cf(env, `/zones?name=${encodeURIComponent(domain)}`);
@@ -126,10 +168,18 @@ async function route(request, env, url) {
         to, cc: cc?.length ? cc : undefined, bcc: bcc?.length ? bcc : undefined,
         subject, text, html,
         reply_to: replyTo || addr,
-        attachments: attachments?.length ? attachments : undefined,
+        attachments: attachments?.length ? cloudflareAttachments(attachments) : undefined,
       }),
     });
-    return json({ ok: true, result });
+    const stored = await recordSentMail(env, { from, to, cc, bcc, subject, text, html, attachments, messageId: result?.message_id });
+    return json({ ok: true, result, ...stored });
+  }
+
+  if (p === "/api/mail" && m === "GET") return json(await listMail(env, Object.fromEntries(url.searchParams)));
+
+  if ((parts = p.match(/^\/api\/mail\/([\w-]+)$/)) && m === "GET") {
+    const mail = await getMail(env, parts[1]);
+    return mail ? json(mail) : json({ error: "Not found" }, 404);
   }
 
   return json({ error: "Not found" }, 404);

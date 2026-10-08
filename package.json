@@ -9,7 +9,8 @@
     "addon:setup": "bash scripts/setup-addon.sh",
     "addon:push": "clasp push -f",
     "addon:open": "clasp open-script",
-    "hero": "node scripts/build-hero.mjs"
+    "hero": "node scripts/build-hero.mjs",
+    "logo": "node scripts/build-logo.mjs"
   },
   "devDependencies": {
     "@google/clasp": "^3.0.0",

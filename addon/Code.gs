@@ -3,6 +3,7 @@
 
 const props = () => PropertiesService.getUserProperties();
 const list = (s) => (s || "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+const LOGO_URL = "https://raw.githubusercontent.com/charanjit-singh/gmail-cloudflare/main/docs/logo.png";
 const lines = (s) => (s || "").split("\n").map((x) => x.trim()).filter(Boolean);
 
 // ---------- Settings and identities ----------
@@ -63,6 +64,8 @@ const filledButton = (text, onClick) =>
 const textButton = (text, onClick) => CardService.newTextButton().setText(text).setOnClickAction(onClick);
 const textInput = (name, title, value, multiline) =>
   CardService.newTextInput().setFieldName(name).setTitle(title).setValue(value || "").setMultiline(!!multiline);
+// Gmail renders card text as HTML and drops anything inside <...>.
+const plain = (text) => String(text || "").replace(/</g, "(").replace(/>/g, ")");
 const note = (text) => CardService.newTextParagraph().setText(text);
 const showCard = (card) =>
   CardService.newActionResponseBuilder().setNavigation(CardService.newNavigation().updateCard(card)).build();
@@ -84,14 +87,14 @@ function fromDropdown(selected) {
 }
 
 function header(title, subtitle) {
-  const built = CardService.newCardHeader().setTitle(title);
+  const built = CardService.newCardHeader().setTitle(title).setImageUrl(LOGO_URL);
   return subtitle ? built.setSubtitle(subtitle) : built;
 }
 
 function resultCard(title, detail, ok) {
   const row = CardService.newDecoratedText()
-    .setText("<b>" + title + "</b>")
-    .setBottomLabel(detail)
+    .setText("<b>" + plain(title) + "</b>")
+    .setBottomLabel(plain(detail))
     .setWrapText(true)
     .setStartIcon(icon(ok ? "CONFIRMATION_NUMBER_ICON" : "DESCRIPTION"));
   return CardService.newCardBuilder().addSection(CardService.newCardSection().addWidget(row)).build();
@@ -146,47 +149,57 @@ function composeCard(values, context) {
 function send(e) {
   const form = e.formInput;
   const from = chosenFrom(form);
-  const error = post(from, { to: list(form.to), cc: list(form.cc), subject: form.subject || "", text: form.body || "" });
-  return error ? notify("Send failed: " + error) : notify("Sent from " + labelFor(from), true);
+  const payload = { to: list(form.to), cc: list(form.cc), subject: form.subject || "", text: form.body || "" };
+  const result = post(from, payload);
+  if (result.error) return notify("Send failed: " + result.error);
+  const copyError = saveSentCopy(buildRaw(from, payload, result.messageId));
+  return notify(copyError ? "Sent, but not copied to Sent: " + copyError : "Sent!", true);
 }
 
 // ---------- Compose window ----------
 
-// Compose-window action (see composeTrigger in appsscript.json): sends the open draft from a chosen address.
+// Compose-window action (see composeTrigger in appsscript.json): pick an account, tap it, sent.
 function sendDraft() {
-  if (!identities().length) return resultCard("Set up your addresses", "Open the add-on and save at least one From address in Settings.", false);
+  const accounts = identities();
+  if (!accounts.length) return resultCard("Set up your addresses", "Open the add-on and save at least one From address in Settings.", false);
   const draft = GmailApp.getDrafts().sort((x, y) => y.getMessage().getDate() - x.getMessage().getDate())[0];
   if (!draft) return resultCard("No draft found", "Wait a few seconds for Gmail to auto-save, then try again.", false);
-  if (identities().length === 1) return deliverDraft(draft, chosenFrom({}));
-  return draftChooserCard(draft);
+  if (accounts.length === 1) return deliverDraft(draft, accounts[0].value);
+  return accountPickerCard(draft, accounts);
 }
 
-function draftChooserCard(draft) {
+function accountPickerCard(draft, accounts) {
   const message = draft.getMessage();
+  const last = props().getProperty("LAST_FROM");
+  const ordered = accounts.slice().sort((x, y) => (y.value === last) - (x.value === last));
   const summary = CardService.newCardSection()
-    .addWidget(CardService.newDecoratedText().setTopLabel("To").setText(message.getTo() || "No recipient").setStartIcon(icon("EMAIL")).setWrapText(true))
-    .addWidget(CardService.newDecoratedText().setTopLabel("Subject").setText(message.getSubject() || "No subject").setStartIcon(icon("DESCRIPTION")).setWrapText(true));
-  const chooser = CardService.newCardSection().addWidget(fromDropdown());
-  const footer = CardService.newFixedFooter().setPrimaryButton(
-    filledButton("Send", action("sendDraftFrom", { draftId: draft.getId() }))
-  );
+    .addWidget(CardService.newDecoratedText().setTopLabel("To").setText(plain(message.getTo()) || "No recipient").setWrapText(true))
+    .addWidget(CardService.newDecoratedText().setTopLabel("Subject").setText(plain(message.getSubject()) || "No subject").setWrapText(true));
+  const picker = CardService.newCardSection().setHeader("Send from");
+  ordered.forEach((account) => {
+    picker.addWidget(
+      CardService.newDecoratedText()
+        .setText(plain(account.label))
+        .setStartIcon(icon("EMAIL"))
+        .setOnClickAction(action("sendDraftFrom", { draftId: draft.getId(), from: account.value }))
+    );
+  });
   return CardService.newCardBuilder()
-    .setHeader(header("Send this message", "Choose the address to send from"))
+    .setHeader(header("Which account?", "Tap one to send"))
     .addSection(summary)
-    .addSection(chooser)
-    .setFixedFooter(footer)
+    .addSection(picker)
     .build();
 }
 
 function sendDraftFrom(e) {
-  const draft = GmailApp.getDraft(e.parameters.draftId);
-  return showCard(deliverDraft(draft, chosenFrom(e.formInput)));
+  props().setProperty("LAST_FROM", e.parameters.from);
+  return showCard(deliverDraft(GmailApp.getDraft(e.parameters.draftId), e.parameters.from));
 }
 
-// Sends the draft and returns the card to show.
+// Sends the draft, keeps a copy in Gmail's Sent folder, and returns the card to show.
 function deliverDraft(draft, from) {
   const message = draft.getMessage();
-  const error = post(from, {
+  const result = post(from, {
     to: list(message.getTo()),
     cc: list(message.getCc()),
     bcc: list(message.getBcc()),
@@ -195,12 +208,56 @@ function deliverDraft(draft, from) {
     html: message.getBody(),
     attachments: message.getAttachments().map((file) => ({
       filename: file.getName(),
+      type: file.getContentType(),
       content: Utilities.base64Encode(file.getBytes()),
     })),
   });
-  if (error) return resultCard("Could not send", error, false);
+  if (result.error) return resultCard("Could not send", result.error, false);
+  const copyError = saveSentCopy(rawWithSender(message.getRawContent(), from, result.messageId));
   draft.deleteDraft();
-  return resultCard("Sent", "From " + labelFor(from) + "\nTo " + (message.getTo() || "recipient"), true);
+  const detail = "From " + labelFor(from) + "\nTo " + (message.getTo() || "recipient");
+  return resultCard("Sent!", copyError ? detail + "\nNot copied to Sent: " + copyError : detail, true);
+}
+
+// ---------- Sent copy ----------
+
+function setHeader(raw, name, value) {
+  const split = raw.search(/\r?\n\r?\n/);
+  const head = raw.slice(0, split).replace(new RegExp("^" + name + ":.*(\\r?\\n[ \\t].*)*\\r?\\n?", "gim"), "");
+  return name + ": " + value + "\r\n" + head + raw.slice(split);
+}
+
+const encodeWord = (text) => (/^[\x20-\x7e]*$/.test(text) ? text : "=?UTF-8?B?" + Utilities.base64Encode(text, Utilities.Charset.UTF_8) + "?=");
+
+function rawWithSender(raw, from, messageId) {
+  const withFrom = setHeader(raw, "From", from);
+  return messageId ? setHeader(withFrom, "Message-ID", messageId) : withFrom;
+}
+
+function buildRaw(from, payload, messageId) {
+  const headers = [
+    "From: " + from,
+    "To: " + payload.to.join(", "),
+    payload.cc && payload.cc.length ? "Cc: " + payload.cc.join(", ") : null,
+    "Subject: " + encodeWord(payload.subject),
+    "Date: " + Utilities.formatDate(new Date(), "UTC", "EEE, dd MMM yyyy HH:mm:ss Z"),
+    messageId ? "Message-ID: " + messageId : null,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+  ].filter(Boolean);
+  return headers.join("\r\n") + "\r\n\r\n" + Utilities.base64Encode(payload.text, Utilities.Charset.UTF_8);
+}
+
+// Puts a copy of the sent mail in Gmail's Sent folder. Returns an error string, or null.
+function saveSentCopy(raw) {
+  try {
+    Gmail.Users.Messages.insert({ raw: Utilities.base64EncodeWebSafe(raw), labelIds: ["SENT"] }, "me");
+    return null;
+  } catch (error) {
+    console.error("Could not save the sent copy: " + error);
+    return String(error.message || error);
+  }
 }
 
 // ---------- Settings ----------
@@ -253,11 +310,11 @@ function saveSettings(e) {
 
 // ---------- Worker ----------
 
-// Posts to the Worker. Returns an error string, or null on success.
+// Posts to the Worker. Returns { messageId } on success or { error }.
 function post(from, payload) {
   const p = props().getProperties();
-  if (!p.WORKER_URL || !from) return "Open Settings first.";
-  if (!payload.to.length) return "Add a recipient.";
+  if (!p.WORKER_URL || !from) return { error: "Open Settings first." };
+  if (!payload.to.length) return { error: "Add a recipient." };
   const response = UrlFetchApp.fetch(p.WORKER_URL + "/api/send", {
     method: "post",
     contentType: "application/json",
@@ -265,10 +322,12 @@ function post(from, payload) {
     muteHttpExceptions: true,
     payload: JSON.stringify(Object.assign({ from }, payload)),
   });
-  if (response.getResponseCode() === 200) return null;
+  let body = {};
   try {
-    return JSON.parse(response.getContentText()).error;
+    body = JSON.parse(response.getContentText());
   } catch (error) {
-    return "HTTP " + response.getResponseCode();
+    console.error("Worker reply was not JSON: " + error);
   }
+  if (response.getResponseCode() === 200) return { messageId: body.result && body.result.message_id };
+  return { error: body.error || "HTTP " + response.getResponseCode() };
 }

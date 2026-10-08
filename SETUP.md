@@ -78,6 +78,42 @@ In Gmail open the "Send as alias" icon in the right side panel > Settings and en
 
 Recipients who reply write to your domain address, which Cloudflare forwards to Gmail.
 
+## Mail archive (optional)
+
+Every message sent through the Worker is saved to a D1 database, and the dashboard shows a **Sent mail** list you can search and open. HTML mail renders in a sandboxed frame.
+
+```
+npx wrangler d1 create gmail-cloudflare-mail
+npx wrangler d1 execute gmail-cloudflare-mail --remote --file schema.sql
+```
+
+Add the binding printed by the first command to `wrangler.toml`, then deploy:
+
+```
+[[d1_databases]]
+binding = "DB"
+database_name = "gmail-cloudflare-mail"
+database_id = "<id from the create command>"
+```
+
+Without the binding, sending still works and nothing is saved. The `mail` table already has a `direction` column, so received mail can be added later.
+
+## Chrome extension (optional)
+
+The extension adds a **Send as alias** button to Gmail's compose window (pick an account, tap, sent) and a **Sent as alias** page in the left menu. It uses [InboxSDK](https://github.com/InboxSDK/InboxSDK).
+
+```
+cd extension
+npm install
+npm run build
+```
+
+1. Open `chrome://extensions`, turn on Developer mode, choose **Load unpacked** and pick `extension/dist`.
+2. Open the extension's settings and enter the Worker URL, admin password and From addresses (`Name · address@yourdomain.com`, one per line). **Test connection** checks the domains.
+3. Optional: register a free app ID at [register.inboxsdk.com](https://register.inboxsdk.com) and paste it into settings.
+
+Limits: the compose button sends text and HTML only. For messages with attachments, use the add-on's **Send via custom domain** action.
+
 ## Local development
 
 Create `.dev.vars`:

@@ -9,12 +9,13 @@
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/script.external_request",
-    "https://www.googleapis.com/auth/script.locale"
+    "https://www.googleapis.com/auth/script.locale",
+    "https://www.googleapis.com/auth/gmail.insert"
   ],
   "addOns": {
     "common": {
       "name": "Send as alias",
-      "logoUrl": "https://www.gstatic.com/images/icons/material/system/1x/mail_black_24dp.png",
+      "logoUrl": "https://raw.githubusercontent.com/charanjit-singh/gmail-cloudflare/main/docs/logo.png",
       "useLocaleFromApp": true,
       "homepageTrigger": {
         "runFunction": "onHome"
@@ -37,5 +38,14 @@
         "draftAccess": "NONE"
       }
     }
+  },
+  "dependencies": {
+    "enabledAdvancedServices": [
+      {
+        "userSymbol": "Gmail",
+        "serviceId": "gmail",
+        "version": "v1"
+      }
+    ]
   }
 }

@@ -20,12 +20,22 @@
   .grow { flex:1; min-width:140px; }
   .pill { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
   .ok { color:var(--ok); } .bad { color:var(--bad); } .mute { color:var(--mute); font-size:13px; }
+  .mail-row { display:block; width:100%; text-align:left; background:transparent; color:var(--fg); border:0; border-top:1px solid var(--line); border-radius:0; padding:10px 4px; cursor:pointer; }
+  .mail-row:hover { background:var(--bg); }
+  .mail-row .top { display:flex; gap:8px; justify-content:space-between; }
+  .mail-row .subject { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mail-row .when { color:var(--mute); font-size:12px; white-space:nowrap; }
+  .mail-view h3 { margin:4px 0 8px; font-size:17px; }
+  .mail-view dl { display:grid; grid-template-columns:auto 1fr; gap:2px 12px; margin:0 0 10px; font-size:13px; }
+  .mail-view dt { color:var(--mute); } .mail-view dd { margin:0; word-break:break-word; }
+  .mail-frame { width:100%; min-height:360px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .mail-text { white-space:pre-wrap; word-break:break-word; margin:0; font:inherit; }
   #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#222; color:#fff; padding:8px 14px; border-radius:8px; display:none; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Mail Forwarding <span class="mute">Cloudflare Email Routing to Gmail</span></h1>
+  <h1><img src="cloudflare.svg" alt="Cloudflare" height="28" style="vertical-align:-6px;margin-right:10px">Mail Forwarding <span class="mute">Cloudflare Email Routing to Gmail</span></h1>
 
   <div id="login" class="card" hidden>
     <h2>Sign in</h2>
@@ -36,6 +46,19 @@
   </div>
 
   <div id="app" hidden>
+    <div class="card" id="mailCard" hidden>
+      <h2>Sent mail</h2>
+      <div id="mailList">
+        <div class="row">
+          <input id="mailSearch" class="grow" type="search" placeholder="Search subject, sender or recipient">
+          <button id="mailSearchBtn">Search</button>
+        </div>
+        <div id="mailRows"></div>
+        <div class="row"><button id="mailMore" hidden>Load more</button></div>
+      </div>
+      <div id="mailView" class="mail-view" hidden></div>
+    </div>
+
     <div class="card">
       <h2>1. Inboxes you forward to</h2>
       <p class="mute">Add each real inbox (e.g. your Gmail). Cloudflare emails a verification link once per address.</p>
