@@ -30,9 +30,10 @@ npm install
 npx wrangler secret put CF_API_TOKEN
 npx wrangler secret put ADMIN_PASSWORD
 npx wrangler deploy
+npm run addon:setup   # creates and pushes the Gmail add-on via clasp
 ```
 
-Then open the Worker URL, add your Gmail, enable routing, and install the add-on from `addon/`.
+Then open the Worker URL, add your Gmail, enable routing, and install the add-on (Deploy > Test deployments > Install).
 
 ## Limits
 

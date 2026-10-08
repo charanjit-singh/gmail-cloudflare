@@ -47,12 +47,25 @@ Test by emailing `anything@yourdomain.com` from another account.
 
 ## 4. Configure sending
 
-1. In the Cloudflare dashboard open Email Service > Email Sending and onboard your domain. Cloudflare adds the SPF and DKIM records. Wait until the domain shows as verified.
-2. Go to [script.google.com](https://script.google.com) and create a new project.
-3. Project Settings > tick "Show appsscript.json manifest file in editor".
-4. Replace the contents of `Code.gs` with `addon/Code.gs` and `appsscript.json` with `addon/appsscript.json`.
-5. Deploy > Test deployments > Select type: Gmail Add-on > Install. Reload Gmail and approve the permissions (send requests to external services, read and compose drafts).
-6. In Gmail open the "Send as alias" icon in the right side panel > Settings and enter:
+### 4a. Cloudflare
+
+In the Cloudflare dashboard open Email Service > Email Sending and onboard your domain. Cloudflare adds the SPF and DKIM records. Wait until the domain shows as verified.
+
+### 4b. Gmail add-on
+
+Automated (uses [clasp](https://github.com/google/clasp), Google's Apps Script CLI):
+
+1. Turn on the Apps Script API once at [script.google.com/home/usersettings](https://script.google.com/home/usersettings).
+2. Run `npm run addon:setup`. It logs you in, creates the Apps Script project and pushes `addon/` to it. Re-running only pushes.
+3. Run `npm run addon:open`, then Deploy > Test deployments > Install. Installing is the one step with no CLI. Reload Gmail and approve the permissions (external requests, read and compose drafts).
+
+After editing `addon/`, run `npm run addon:push`.
+
+Manual alternative: at [script.google.com](https://script.google.com) create a project, tick "Show appsscript.json manifest file in editor" in Project Settings, paste in `addon/Code.gs` and `addon/appsscript.json`, then Deploy > Test deployments > Install.
+
+### 4c. Add-on settings
+
+In Gmail open the "Send as alias" icon in the right side panel > Settings and enter:
    - Worker URL
    - Admin password
    - From address, e.g. `Me <hello@yourdomain.com>`
@@ -84,6 +97,6 @@ Run `npm run dev` and open the printed local URL.
 | Cloudflare error about permissions | Recheck the token scopes in step 1 and the zone resources. |
 | Inbox stays "pending verification" | Check spam for the Cloudflare email, or Add inbox again to resend. |
 | "Domain ... is not in this Cloudflare account" on send | The From address domain must be a zone the token can read. |
-| Send fails with a Cloudflare error | Confirm the domain finished Email Sending onboarding (step 4.1). |
+| Send fails with a Cloudflare error | Confirm the domain finished Email Sending onboarding (step 4a). |
 | "No draft found" | Wait a few seconds after typing, then try again. |
 | Compose action shows a card or an error | Use the side panel form instead. Gmail's handling of compose actions is a Google limitation. |
