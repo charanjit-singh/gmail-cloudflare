@@ -112,12 +112,14 @@ function setupDomainLabels(domains) {
     return null;
   } catch (error) {
     console.error("Could not set up domain labels: " + error);
-    props().setProperty("LABEL_ERROR", String(error.message || error));
-    return String(error.message || error);
+    const message = String(error.message || error);
+    props().setProperty("LABEL_ERROR", /permission/i.test(message) ? PERMISSION_ERROR : message);
+    return message;
   }
 }
 
 function labelsNeedSetup(domains) {
+  if (props().getProperty("LABEL_ERROR") === PERMISSION_ERROR) return false;
   return Boolean(domains) && Object.keys(domainLabelIds()).sort().join(",") !== domains.slice().sort().join(",");
 }
 
@@ -342,64 +344,131 @@ function saveSentCopy(raw, from) {
 
 // ---------- Settings ----------
 
+const LABEL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/gmail.settings.basic"];
+const PERMISSION_ERROR = "permission";
+
+function materialIcon(name) {
+  try {
+    return CardService.newIconImage().setMaterialIcon(CardService.newMaterialIcon().setName(name));
+  } catch (error) {
+    console.error("Material icons unavailable, using a built-in icon: " + error);
+    return icon("EMAIL");
+  }
+}
+
+const hostOf = (url) => String(url || "").replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+const pushCard = (card) => CardService.newActionResponseBuilder().setNavigation(CardService.newNavigation().pushCard(card)).build();
+
 function openSettings() {
-  return CardService.newActionResponseBuilder().setNavigation(CardService.newNavigation().pushCard(settingsCard())).build();
+  return pushCard(settingsCard());
 }
 
 function settingsCard() {
   const p = props();
-  const synced = p.getProperty("WORKER_URL") ? syncAccounts() : null;
-  const connection = CardService.newCardSection()
-    .setHeader("Connection")
-    .addWidget(textInput("WORKER_URL", "Worker URL", p.getProperty("WORKER_URL")))
-    .addWidget(textInput("ADMIN_PASSWORD", "Admin password", p.getProperty("ADMIN_PASSWORD")))
-    .addWidget(note("That's all you need. Accounts load from your Worker."));
-  const card = CardService.newCardBuilder().setHeader(header("Settings")).addSection(connection);
-  if (synced) card.addSection(accountsSection(synced)).addSection(labelsSection());
-  const footer = CardService.newFixedFooter().setPrimaryButton(filledButton("Save", action("saveSettings")));
-  if (p.getProperty("WORKER_URL")) {
-    footer.setSecondaryButton(
-      CardService.newTextButton().setText("Manage accounts").setOpenLink(CardService.newOpenLink().setUrl(p.getProperty("WORKER_URL")))
-    );
-  }
+  if (!p.getProperty("WORKER_URL") || !p.getProperty("ADMIN_PASSWORD")) return connectionCard();
+  const synced = syncAccounts();
+  const card = CardService.newCardBuilder().setHeader(header("Settings", "Send as alias")).addSection(connectionSection(synced));
+  if (!synced.error) accountSections(synced.accounts).forEach((section) => card.addSection(section));
+  if (!synced.error) card.addSection(labelsSection(synced.receivingDomains || []));
+  const footer = CardService.newFixedFooter().setPrimaryButton(
+    CardService.newTextButton().setText("Manage accounts").setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      .setOpenLink(CardService.newOpenLink().setUrl(p.getProperty("WORKER_URL")))
+  );
   return card.setFixedFooter(footer).build();
 }
 
-function accountsSection(synced) {
-  const section = CardService.newCardSection().setHeader("Sending accounts");
-  if (synced.error) return section.addWidget(note(plain(synced.error)));
-  if (!synced.accounts.length) return section.addWidget(note("No accounts yet. Add them on the Worker dashboard."));
-  synced.accounts.forEach((account) => {
+function connectionSection(synced) {
+  const row = CardService.newDecoratedText()
+    .setTopLabel(synced.error ? "Can't connect" : "Connected to")
+    .setText(plain(hostOf(props().getProperty("WORKER_URL"))))
+    .setStartIcon(materialIcon(synced.error ? "cloud_off" : "cloud_done"))
+    .setButton(CardService.newTextButton().setText("Change").setOnClickAction(action("openConnection")));
+  const section = CardService.newCardSection().addWidget(row);
+  return synced.error ? section.addWidget(note(plain(synced.error))) : section;
+}
+
+function accountSections(accounts) {
+  if (!accounts.length) {
+    return [CardService.newCardSection().setHeader("Sending accounts").addWidget(note("No accounts yet. Tap Manage accounts to add them."))];
+  }
+  const byDomain = {};
+  accounts.forEach((account) => (byDomain[domainOfEmail(account.email)] = (byDomain[domainOfEmail(account.email)] || []).concat(account)));
+  return Object.keys(byDomain).sort().map((domain) => {
+    const section = CardService.newCardSection().setHeader(domain);
+    byDomain[domain].forEach((account) => {
+      section.addWidget(
+        CardService.newDecoratedText().setText(plain(account.name || account.email)).setBottomLabel(plain(account.email)).setStartIcon(materialIcon("account_circle"))
+      );
+    });
+    return section;
+  });
+}
+
+const domainOfEmail = (email) => (email.split("@")[1] || "").toLowerCase();
+
+function labelsSection(domains) {
+  const section = CardService.newCardSection().setHeader("Inbox labels");
+  const error = props().getProperty("LABEL_ERROR");
+  if (error === PERMISSION_ERROR) {
+    return section.addWidget(
+      CardService.newDecoratedText().setText("Gmail needs one more permission").setBottomLabel("To add a label for each domain")
+        .setStartIcon(materialIcon("lock")).setWrapText(true)
+        .setButton(CardService.newTextButton().setText("Allow").setOnClickAction(action("allowLabelAccess")))
+    );
+  }
+  if (error) return section.addWidget(note("Couldn't set up labels: " + plain(error)));
+  const ready = domainLabelIds();
+  domains.forEach((domain) => {
     section.addWidget(
-      CardService.newDecoratedText().setText(plain(account.name || account.email)).setBottomLabel(plain(account.email)).setStartIcon(icon("EMAIL"))
+      CardService.newDecoratedText().setText(domain).setBottomLabel(ready[domain] ? "Labelled in your inbox" : "Not set up yet")
+        .setStartIcon(materialIcon(ready[domain] ? "label" : "label_off"))
     );
   });
   return section;
 }
 
-function labelsSection() {
-  const section = CardService.newCardSection().setHeader("Domain labels");
-  const ready = Object.keys(domainLabelIds());
-  const error = props().getProperty("LABEL_ERROR");
-  if (error) return section.addWidget(note("Couldn't set up labels: " + plain(error)));
-  if (!ready.length) return section.addWidget(note("Not set up yet. Press Save to create them."));
-  return section.addWidget(note("Ready: " + ready.join(", ")));
+function allowLabelAccess() {
+  if (ScriptApp.requireScopes) ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, LABEL_SCOPES);
+  props().deleteProperty("DOMAIN_LABELS");
+  props().deleteProperty("LABEL_ERROR");
+  const synced = syncAccounts();
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText(synced.labelError ? "Labels still failed. See Settings." : "Inbox labels are ready"))
+    .setNavigation(CardService.newNavigation().updateCard(settingsCard()))
+    .build();
+}
+
+function openConnection() {
+  return pushCard(connectionCard());
+}
+
+function connectionCard() {
+  const p = props();
+  const hasPassword = Boolean(p.getProperty("ADMIN_PASSWORD"));
+  const section = CardService.newCardSection()
+    .addWidget(textInput("WORKER_URL", "Worker URL", p.getProperty("WORKER_URL")))
+    .addWidget(
+      CardService.newTextInput().setFieldName("ADMIN_PASSWORD").setTitle("Admin password")
+        .setHint(hasPassword ? "Leave empty to keep the saved password" : "The dashboard password")
+    );
+  const footer = CardService.newFixedFooter().setPrimaryButton(filledButton("Connect", action("saveSettings")));
+  return CardService.newCardBuilder().setHeader(header("Connect", "Your Worker URL and password")).addSection(section).setFixedFooter(footer).build();
 }
 
 function saveSettings(e) {
   const form = e.formInput;
-  props().setProperties({
-    WORKER_URL: (form.WORKER_URL || "").trim().replace(/\/$/, ""),
-    ADMIN_PASSWORD: (form.ADMIN_PASSWORD || "").trim(),
-  });
+  const password = (form.ADMIN_PASSWORD || "").trim() || props().getProperty("ADMIN_PASSWORD") || "";
+  const workerUrl = (form.WORKER_URL || "").trim().replace(/\/$/, "");
+  if (!workerUrl || !password) return notify("Enter the Worker URL and the admin password.");
+  props().setProperties({ WORKER_URL: workerUrl, ADMIN_PASSWORD: password });
   props().deleteProperty("FROM_ADDRESS");
   props().deleteProperty("DOMAIN_LABELS");
   const synced = syncAccounts();
   if (synced.error) return notify(synced.error);
-  const count = synced.accounts.length;
-  const loaded = "Connected. " + count + " account" + (count === 1 ? "" : "s") + " loaded";
-  if (synced.labelError) return notify(loaded + ", but domain labels failed: " + synced.labelError);
-  return notify(loaded + ", domain labels ready.", true);
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText("Connected. " + synced.accounts.length + " accounts loaded."))
+    .setNavigation(CardService.newNavigation().popToRoot().updateCard(settingsCard()))
+    .build();
 }
 
 // ---------- Worker ----------
