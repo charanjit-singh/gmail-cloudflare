@@ -116,6 +116,15 @@ npm run build
 2. Open the extension's options, enter the Worker URL and admin password, and click **Connect**. Your sending accounts load automatically.
 3. Reload Gmail.
 
+### Sent copies in Gmail (optional)
+
+Without this, every extension send is silently BCC'd to `DEFAULT_DESTINATION`, so a copy still reaches your inbox.
+With it, the extension saves a real copy in Gmail's **Sent**, in the right conversation, and replies thread for the recipient.
+
+1. Create `extension/local.json` (not committed) with a fixed extension key; `npm run build` reads it. The key's extension ID is what Google needs.
+2. In [Google Cloud console](https://console.cloud.google.com): enable the **Gmail API**; set up the **OAuth consent screen** (External, Testing) and add your Gmail as a test user; then **Credentials > Create credentials > OAuth client ID > Chrome extension** with that extension ID.
+3. Put the client ID in `local.json` as `oauthClientId`, rebuild, reload the extension. The first send asks for Gmail access once.
+
 Limits: the button finds Gmail's compose window by its page structure, so a Gmail redesign can break it. It sends text and HTML only; for messages with attachments use the add-on's **Send via custom domain** action.
 
 ## Local development

@@ -1,3 +1,5 @@
+import { saveSentCopy, threadContext } from "./gmail-copy.js";
+
 async function callWorker({ path, method, body }) {
   const { workerUrl, password } = await chrome.storage.local.get({ workerUrl: "", password: "" });
   if (!workerUrl || !password) {
@@ -37,6 +39,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message?.type === "sync-accounts") {
     syncAccounts().then(sendResponse);
+    return true;
+  }
+  if (message?.type === "thread-context") {
+    threadContext(message.threadId)
+      .then((context) => sendResponse({ ok: true, ...context }))
+      .catch((error) => sendResponse({ ok: false, canSaveToGmail: true, error: error.message }));
+    return true;
+  }
+  if (message?.type === "save-sent-copy") {
+    saveSentCopy(message.mail)
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
   if (message?.type === "open-options") chrome.runtime.openOptionsPage();

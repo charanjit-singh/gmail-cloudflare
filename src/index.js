@@ -73,6 +73,13 @@ function cloudflareAttachments(attachments) {
 const attachmentBytes = (attachments) =>
   (attachments || []).reduce((total, file) => total + Math.floor((file.content || "").length * BASE64_BYTES_PER_CHAR), 0);
 
+// Silently copies a send to our own inbox (for clients that can't save into Gmail's Sent folder).
+function withInboxCopy(bcc, visibleRecipients, inbox) {
+  const list = bcc || [];
+  if (!inbox || [...visibleRecipients, ...list].some((address) => address.toLowerCase().includes(inbox.toLowerCase()))) return list;
+  return [...list, inbox];
+}
+
 // The mail has already been sent, so a failed save is reported to the caller instead of failing the send.
 async function recordSentMail(env, mail) {
   if (!env.DB) return { stored: false, storeError: "D1 is not set up" };
@@ -171,10 +178,11 @@ async function route(request, env, url) {
   }
 
   if (p === "/api/send" && m === "POST") {
-    let { from, to, cc, bcc, subject, text, html, replyTo, attachments } = await request.json();
+    let { from, to, cc, bcc, subject, text, html, replyTo, attachments, copyToInbox, inReplyTo, references } = await request.json();
     if (!from) return json({ error: "Pick an account to send from." }, 400);
     if (!to?.length) return json({ error: "Add at least one recipient in To." }, 400);
     subject = (subject || "").trim() || "(no subject)";
+    bcc = withInboxCopy(bcc, [...to, ...(cc || [])], copyToInbox && env.DEFAULT_DESTINATION);
     if (!text?.trim() && !html?.trim()) return json({ error: "Message is empty. Type something in the Message box and send again." }, 400);
     if (attachmentBytes(attachments) > MAX_MESSAGE_BYTES) {
       return json({ error: "Attachments are over 5 MB in total. Send smaller files or share a link." }, 413);
@@ -191,6 +199,7 @@ async function route(request, env, url) {
         subject, text, html,
         reply_to: replyTo || addr,
         attachments: attachments?.length ? cloudflareAttachments(attachments) : undefined,
+        headers: inReplyTo ? { "In-Reply-To": inReplyTo, References: references || inReplyTo } : undefined,
       }),
     });
     const stored = await recordSentMail(env, { from, to, cc, bcc, subject, text, html, attachments, messageId: result?.message_id });

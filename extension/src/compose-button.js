@@ -185,21 +185,36 @@ function setBusy(split, busy) {
   if (!busy) refreshLabels();
 }
 
+// In an open conversation Gmail tags the subject with the thread ID the Gmail API understands.
+function threadIdOf(root) {
+  if (root.closest('div[role="dialog"]')) return null;
+  return document.querySelector("h2[data-legacy-thread-id], [data-legacy-thread-id]")?.getAttribute("data-legacy-thread-id") || null;
+}
+
 async function send(split, root, account) {
   if (split.getAttribute("aria-busy") === "true") return;
   const draft = readDraft(root);
   const problem = problemWith(draft);
   if (problem) return snackbar(problem);
   setBusy(split, true);
+  const threadId = threadIdOf(root);
+  const context = (await chrome.runtime.sendMessage({ type: "thread-context", threadId })) || {};
   const { hasAttachments, ...message } = draft;
-  const result = await api("/send", "POST", { from: account.value, ...message });
+  const outgoing = { from: account.value, ...message, inReplyTo: context.inReplyTo, references: context.references };
+  const result = await api("/send", "POST", { ...outgoing, copyToInbox: !context.canSaveToGmail });
   if (!result?.ok) {
     setBusy(split, false);
     return snackbar("Couldn't send: " + (result?.error || "no reply from the extension"));
   }
   await chrome.storage.local.set({ lastFrom: account.value });
+  const copy = context.canSaveToGmail
+    ? await chrome.runtime.sendMessage({ type: "save-sent-copy", mail: { ...outgoing, threadId, messageId: result.data.result?.message_id } })
+    : { ok: true };
   root.querySelector(DISCARD)?.click();
-  snackbar("Message sent from " + account.email, "View", () => chrome.runtime.sendMessage({ type: "open-archive" }));
+  const sent = "Message sent from " + account.email;
+  snackbar(copy?.ok ? sent : sent + ". Not saved to Gmail Sent: " + (copy?.error || "unknown reason"), "View", () =>
+    chrome.runtime.sendMessage({ type: "open-archive" })
+  );
 }
 
 function snackbar(text, actionLabel, onAction) {
