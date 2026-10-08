@@ -4,12 +4,12 @@ Receive on a custom domain, read and send from your everyday Gmail.
 
 - **Receive:** Cloudflare Email Routing forwards `anything@yourdomain.com` to `abcd@gmail.com`.
 - **Dashboard:** a small Cloudflare Worker + static page to verify your Gmail, enable routing, set a catch-all and manage aliases.
-- **Send:** a Chrome extension adds a "Send as alias" button to Gmail compose. It posts to the Worker, which sends via Resend from your domain address.
+- **Send:** a Gmail Add-on (side panel, works on web and mobile) lets you compose or reply from your domain address. It posts to the Worker, which sends via Resend.
 
 ```
 src/index.js    Worker: Cloudflare API proxy + /api/send
 public/         Dashboard (served by the same Worker)
-extension/      Chrome MV3 extension for Gmail
+addon/          Gmail Add-on (Apps Script)
 ```
 
 ## Setup
@@ -33,14 +33,15 @@ extension/      Chrome MV3 extension for Gmail
 ## Sending
 
 1. Create a [Resend](https://resend.com) account, verify your domain, create an API key.
-2. In `chrome://extensions` enable Developer mode, "Load unpacked", select `extension/`.
-3. Open the extension options and set Worker URL, admin password and From address (e.g. `Me <hello@yourdomain.com>`).
-4. In Gmail compose, click **Send as alias**. Replies go to your domain address and are forwarded to Gmail.
+2. Go to [script.google.com](https://script.google.com), create a project, enable "Show appsscript.json" in Project Settings, and paste in `addon/Code.gs` and `addon/appsscript.json`.
+3. Deploy > Test deployments > Install (Gmail Add-on). Later you can publish it privately.
+4. In Gmail, open the "Send as alias" icon in the right side panel, then Settings: Worker URL, admin password, From address (e.g. `Me <hello@yourdomain.com>`).
+5. Compose from the side panel, or open any message and reply from the alias. Replies land on your domain and are forwarded to Gmail.
 
 ## Notes
 
-- Gmail's DOM is obfuscated and changes, so the compose selectors in `extension/content.js` may need tweaks.
-- Alternative to the extension: Gmail's built-in Settings > Accounts > "Send mail as" with Resend's SMTP (`smtp.resend.com`, user `resend`, password = API key).
+- Add-ons cannot read the subject or body of Gmail's native compose window, so the panel has its own To/Subject/Message fields. Recipients are prefilled from the open draft.
+- Alternative to the add-on: Gmail's built-in Settings > Accounts > "Send mail as" with Resend's SMTP (`smtp.resend.com`, user `resend`, password = API key).
 - Email Routing needs the domain's DNS on Cloudflare. It replaces existing MX records.
 - The Worker is protected by a single shared password. For stricter access put it behind Cloudflare Access.
 - Local dev: put secrets in `.dev.vars`, run `npm run dev`.
