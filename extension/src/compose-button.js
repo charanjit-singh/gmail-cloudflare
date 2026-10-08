@@ -1,43 +1,41 @@
 import { api, escapeHtml, identitiesFrom, loadSettings } from "./shared.js";
+import { STYLES, CHEVRON, CHECK, avatarColor } from "./compose-styles.js";
 
 const SEND_BUTTON = 'div[role="button"][data-tooltip^="Send"]';
-// Gmail's tooltip is "Send" or "Send (⌘Enter)". Add-on icons such as "Send as alias" also start with "Send".
-const isGmailSend = (element) => /^Send(\s*[(\u202a]|$)/.test(element.getAttribute("data-tooltip") || "");
-const BODY = 'div[aria-label="Message Body"], div[g_editable="true"]';
 const MORE_SEND_OPTIONS = '[aria-label^="More send options"], [data-tooltip^="More send options"]';
+const BODY = 'div[aria-label="Message Body"], div[g_editable="true"]';
 const DISCARD = '[aria-label^="Discard draft"], [data-tooltip^="Discard draft"]';
 const ATTACHMENT_CHIP = ".aZo, .dL";
 const EMAIL_PATTERN = /[^\s<>,;"]+@[^\s<>,;"]+/;
-const CLOSE_DELAY_MS = 900;
+const SNACKBAR_MS = 6000;
 const MARK = "data-alias-button";
 
-const rowStyle =
-  "display:block;width:100%;text-align:left;padding:8px 10px;margin:2px 0;border:0;border-radius:6px;background:#f1f3f4;cursor:pointer;font:inherit;color:#202124";
+// Gmail's tooltip is "Send" or "Send (⌘Enter)". Add-on icons such as "Send as alias" also start with "Send".
+const isGmailSend = (element) => /^Send(\s*[(‪]|$)/.test(element.getAttribute("data-tooltip") || "");
 
-let popup = null;
+let menu = null;
 
 export function registerComposeButton() {
+  const style = document.createElement("style");
+  style.textContent = STYLES;
+  document.head.append(style);
   addButtons();
   new MutationObserver(addButtons).observe(document.body, { childList: true, subtree: true });
-  document.addEventListener("click", (event) => {
-    if (popup && !popup.contains(event.target) && !event.target.closest(`[${MARK}]`)) closePopup();
-  });
+  document.addEventListener("mousedown", (event) => menu && !menu.contains(event.target) && !event.target.closest(".saa-arrow") && closeMenu(), true);
+  document.addEventListener("keydown", (event) => event.key === "Escape" && closeMenu(), true);
+  chrome.storage.onChanged.addListener(refreshLabels);
 }
 
-function addButtons() {
-  [...document.querySelectorAll(SEND_BUTTON)].filter(isGmailSend).forEach((send) => {
-    const toolbar = send.closest("td") || send.parentElement;
-    if (!toolbar || toolbar.querySelector(`[${MARK}]`)) return;
-    const button = document.createElement("div");
-    button.setAttribute(MARK, "");
-    button.setAttribute("role", "button");
-    button.title = "Send from one of your domain addresses";
-    button.textContent = "Send as alias";
-    button.style.cssText =
-      "display:inline-block;margin-left:8px;padding:0 14px;height:36px;line-height:36px;border-radius:18px;background:#e8f0fe;color:#1a73e8;font:500 14px system-ui,sans-serif;cursor:pointer;user-select:none;vertical-align:middle";
-    button.addEventListener("click", () => openPicker(button, composeRootOf(send)));
-    sendControl(send, toolbar).after(button);
-  });
+async function currentAccount() {
+  const settings = await loadSettings();
+  const accounts = identitiesFrom(settings.addresses);
+  return { accounts, current: accounts.find((account) => account.value === settings.lastFrom) || accounts[0] };
+}
+
+async function refreshLabels() {
+  const { current } = await currentAccount();
+  const name = current ? current.label.split(" · ")[0] : "your domain";
+  document.querySelectorAll(".saa-name").forEach((label) => (label.textContent = name));
 }
 
 // Gmail's Send is a split button: Send plus a dropdown arrow. Climb until both are inside, so we land after the pair.
@@ -49,12 +47,93 @@ function sendControl(send, toolbar) {
   return control;
 }
 
+function addButtons() {
+  [...document.querySelectorAll(SEND_BUTTON)].filter(isGmailSend).forEach((send) => {
+    const toolbar = send.closest("td") || send.parentElement;
+    if (!toolbar || toolbar.querySelector(`[${MARK}]`)) return;
+    const split = document.createElement("div");
+    split.className = "saa-split";
+    split.setAttribute(MARK, "");
+    split.innerHTML =
+      '<div role="button" tabindex="0" class="saa-main" data-tooltip="Send from your domain address"><span>Send as</span><span class="saa-name">…</span></div>' +
+      `<div role="button" tabindex="0" class="saa-arrow" aria-haspopup="menu" data-tooltip="Choose the address">${CHEVRON}</div>`;
+    const root = composeRootOf(send);
+    activate(split.querySelector(".saa-main"), () => sendWithCurrent(split, root));
+    activate(split.querySelector(".saa-arrow"), () => (menu ? closeMenu() : openMenu(split, root)));
+    sendControl(send, toolbar).after(split);
+  });
+  refreshLabels();
+}
+
+function activate(element, handler) {
+  element.addEventListener("click", handler);
+  element.addEventListener("keydown", (event) => (event.key === "Enter" || event.key === " ") && (event.preventDefault(), handler()));
+}
+
 const composeRootOf = (send) => send.closest('div[role="dialog"]') || send.closest("form") || send.closest(".M9, .iN, .nH");
 
+function closeMenu() {
+  menu?.remove();
+  menu = null;
+}
+
+const accountRow = (account, index, isCurrent) =>
+  `<button class="saa-item" role="menuitem" data-index="${index}">` +
+  `<span class="saa-avatar" style="background:${avatarColor(account.email)}">${escapeHtml(account.label[0].toUpperCase())}</span>` +
+  `<span class="saa-text"><b>${escapeHtml(account.label.split(" · ")[0])}</b><span>${escapeHtml(account.email)}</span></span>` +
+  `<span class="saa-check">${isCurrent ? CHECK : ""}</span></button>`;
+
+async function openMenu(split, root) {
+  const { accounts, current } = await currentAccount();
+  if (!accounts.length) return chrome.runtime.sendMessage({ type: "open-options" });
+  menu = document.createElement("div");
+  menu.className = "saa-menu";
+  menu.setAttribute("role", "menu");
+  menu.innerHTML =
+    '<div class="saa-menu-title">Send from</div>' +
+    accounts.map((account, index) => accountRow(account, index, account === current)).join("") +
+    '<div class="saa-divider"></div><button class="saa-item saa-link" data-action="archive">Sent mail</button>' +
+    '<button class="saa-item saa-link" data-action="options">Manage addresses</button>';
+  document.body.append(menu);
+  placeMenu(split);
+  menu.addEventListener("click", (event) => onMenuClick(event, split, root, accounts));
+  menu.addEventListener("keydown", moveFocus);
+  menu.querySelector(".saa-item").focus();
+}
+
+function placeMenu(split) {
+  const rect = split.getBoundingClientRect();
+  const height = menu.offsetHeight;
+  const top = rect.top - height - 8 > 0 ? rect.top - height - 8 : rect.bottom + 8;
+  menu.style.top = top + "px";
+  menu.style.left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8) + "px";
+}
+
+function moveFocus(event) {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  event.preventDefault();
+  const items = [...menu.querySelectorAll(".saa-item")];
+  const step = event.key === "ArrowDown" ? 1 : -1;
+  items[(items.indexOf(document.activeElement) + step + items.length) % items.length].focus();
+}
+
+function onMenuClick(event, split, root, accounts) {
+  const item = event.target.closest(".saa-item");
+  if (!item) return;
+  closeMenu();
+  if (item.dataset.action === "archive") return chrome.runtime.sendMessage({ type: "open-archive" });
+  if (item.dataset.action === "options") return chrome.runtime.sendMessage({ type: "open-options" });
+  send(split, root, accounts[Number(item.dataset.index)]);
+}
+
+async function sendWithCurrent(split, root) {
+  const { current } = await currentAccount();
+  if (!current) return chrome.runtime.sendMessage({ type: "open-options" });
+  send(split, root, current);
+}
+
 const emailsOf = (root, name) =>
-  [...root.querySelectorAll(`input[name="${name}"]`)]
-    .map((input) => (input.value.match(EMAIL_PATTERN) || [])[0])
-    .filter(Boolean);
+  [...root.querySelectorAll(`input[name="${name}"]`)].map((input) => (input.value.match(EMAIL_PATTERN) || [])[0]).filter(Boolean);
 
 function readDraft(root) {
   const body = root.querySelector(BODY);
@@ -69,72 +148,44 @@ function readDraft(root) {
   };
 }
 
-function closePopup() {
-  popup?.remove();
-  popup = null;
-}
-
-function showPopup(anchor, html) {
-  closePopup();
-  popup = document.createElement("div");
-  const rect = anchor.getBoundingClientRect();
-  popup.style.cssText =
-    `position:fixed;z-index:2147483647;left:${Math.max(8, rect.left)}px;top:${rect.bottom + 6}px;min-width:260px;max-width:340px;` +
-    "padding:12px 16px;background:#fff;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);font:13px/1.5 system-ui,sans-serif;color:#202124";
-  popup.innerHTML = html;
-  document.body.append(popup);
-  return popup;
-}
-
-const message = (anchor, title, detail) =>
-  showPopup(anchor, `<div style="font-weight:600">${escapeHtml(title)}</div><div style="color:#5f6368">${escapeHtml(detail)}</div>`);
-
-async function openPicker(anchor, root) {
-  const settings = await loadSettings();
-  const accounts = identitiesFrom(settings.addresses);
-  if (!accounts.length) {
-    const view = showPopup(
-      anchor,
-      `<div style="margin-bottom:8px">Add your From addresses in the extension settings first.</div><button data-open style="${rowStyle}">Open settings</button>`
-    );
-    return view.querySelector("[data-open]").addEventListener("click", () => chrome.runtime.sendMessage({ type: "open-options" }));
-  }
-  const ordered = accounts.slice().sort((a, b) => (b.value === settings.lastFrom) - (a.value === settings.lastFrom));
-  const rows = ordered.map((account, index) => `<button data-index="${index}" style="${rowStyle}">${escapeHtml(account.label)}</button>`).join("");
-  const view = showPopup(anchor, `<div style="font-weight:600;margin-bottom:6px">Send from which account?</div>${rows}`);
-  view.addEventListener("click", (event) => {
-    const row = event.target.closest("[data-index]");
-    if (row) sendNow(anchor, root, ordered[Number(row.dataset.index)]);
-  });
-}
-
 function problemWith(draft) {
-  if (!draft.to.length) return "Add a recipient first.";
-  if (draft.hasAttachments) return "This message has attachments. Use the add-on's Send via custom domain action for files, or remove them.";
-  if (!draft.text.trim()) return "The message is empty.";
+  if (!draft.to.length) return "Add at least one recipient.";
+  if (draft.hasAttachments) return "Attachments can't be sent this way yet. Use the add-on's Send via custom domain.";
+  if (!draft.text.trim()) return "Your message is empty.";
   return null;
 }
 
-async function sendNow(anchor, root, account) {
+function setBusy(split, busy) {
+  split.setAttribute("aria-busy", String(busy));
+  const main = split.querySelector(".saa-main");
+  main.innerHTML = busy ? '<span class="saa-spinner"></span><span>Sending…</span>' : '<span>Send as</span><span class="saa-name"></span>';
+  if (!busy) refreshLabels();
+}
+
+async function send(split, root, account) {
+  if (split.getAttribute("aria-busy") === "true") return;
   const draft = readDraft(root);
   const problem = problemWith(draft);
-  if (problem) return message(anchor, "Not sent", problem);
-  message(anchor, "Sending...", account.label);
-  const result = await api("/send", "POST", {
-    from: account.value,
-    to: draft.to,
-    cc: draft.cc,
-    bcc: draft.bcc,
-    subject: draft.subject,
-    text: draft.text,
-    html: draft.html,
-  });
-  if (!result?.ok) return message(anchor, "Could not send", result?.error || "No reply from the extension.");
+  if (problem) return snackbar(problem);
+  setBusy(split, true);
+  const { hasAttachments, ...message } = draft;
+  const result = await api("/send", "POST", { from: account.value, ...message });
+  if (!result?.ok) {
+    setBusy(split, false);
+    return snackbar("Couldn't send: " + (result?.error || "no reply from the extension"));
+  }
   await chrome.storage.local.set({ lastFrom: account.value });
-  const note = result.data.stored ? "" : " Not saved to the archive: " + (result.data.storeError || "unknown reason");
-  message(anchor, "Sent!", "From " + account.label + "." + note);
-  setTimeout(() => {
-    root.querySelector(DISCARD)?.click();
-    closePopup();
-  }, CLOSE_DELAY_MS);
+  root.querySelector(DISCARD)?.click();
+  snackbar("Message sent from " + account.email, "View", () => chrome.runtime.sendMessage({ type: "open-archive" }));
+}
+
+function snackbar(text, actionLabel, onAction) {
+  document.querySelector(".saa-snackbar")?.remove();
+  const bar = document.createElement("div");
+  bar.className = "saa-snackbar";
+  bar.setAttribute("role", "status");
+  bar.innerHTML = `<span>${escapeHtml(text)}</span>` + (actionLabel ? `<button>${escapeHtml(actionLabel)}</button>` : "");
+  if (actionLabel) bar.querySelector("button").addEventListener("click", () => (bar.remove(), onAction()));
+  document.body.append(bar);
+  setTimeout(() => bar.remove(), SNACKBAR_MS);
 }

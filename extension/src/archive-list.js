@@ -1,19 +1,22 @@
 import { api, escapeHtml } from "./shared.js";
 
 const styles = `
-.saa { max-width:860px; margin:0 auto; padding:16px; font:14px/1.5 system-ui,sans-serif; color:#202124 }
-.saa h2 { font-size:20px; margin:0 0 12px }
-.saa input { padding:8px 10px; border:1px solid #dadce0; border-radius:8px; font:inherit; width:100% }
-.saa .row { display:block; width:100%; text-align:left; border:0; border-top:1px solid #e8eaed; background:transparent; padding:10px 4px; cursor:pointer; font:inherit; color:inherit }
-.saa .row:hover { background:#f6f8fc }
-.saa .top { display:flex; justify-content:space-between; gap:8px }
-.saa .subject { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.saa .mute { color:#5f6368; font-size:12px }
-.saa .button { padding:6px 12px; border:0; border-radius:16px; background:#e8f0fe; color:#1a73e8; cursor:pointer; font:inherit }
-.saa iframe { width:100%; min-height:420px; border:1px solid #dadce0; border-radius:8px; background:#fff }
+.saa { max-width:960px; margin:0 auto; padding:24px 16px; font:14px/20px "Google Sans",Roboto,Arial,sans-serif; color:#1f1f1f }
+.saa h2 { font-size:22px; font-weight:400; margin:0 0 16px }
+.saa input { width:100%; box-sizing:border-box; height:48px; padding:0 20px; border:0; border-radius:24px; background:#eaf1fb; font:inherit; font-size:16px; outline:none; margin-bottom:12px }
+.saa input:focus { background:#fff; box-shadow:0 1px 1px rgba(65,69,73,.3), 0 1px 3px 1px rgba(65,69,73,.15) }
+.saa .rows { border-radius:16px; overflow:hidden; background:#fff }
+.saa .row { display:block; width:100%; box-sizing:border-box; text-align:left; border:0; border-bottom:1px solid #f1f3f4; background:#fff; padding:12px 16px; cursor:pointer; font:inherit; color:inherit }
+.saa .row:hover { box-shadow:inset 1px 0 0 #dadce0, inset -1px 0 0 #dadce0, 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15); position:relative; z-index:1 }
+.saa .top { display:flex; justify-content:space-between; gap:12px }
+.saa .subject { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.saa .mute { color:#5e5e5e; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.saa .button { height:36px; padding:0 24px; border:1px solid #747775; border-radius:18px; background:#fff; color:#0b57d0; cursor:pointer; font:500 14px "Google Sans",Roboto,Arial,sans-serif; margin-top:12px }
+.saa .button:hover { background:#f0f4fb }
+.saa iframe { width:100%; min-height:480px; border:0; border-radius:12px; background:#fff }
 .saa pre { white-space:pre-wrap; word-break:break-word; margin:0; font:inherit }
-.saa dl { display:grid; grid-template-columns:auto 1fr; gap:2px 12px; font-size:13px }
-.saa dt { color:#5f6368 } .saa dd { margin:0; word-break:break-word }
+.saa dl { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; font-size:13px; margin:0 0 16px }
+.saa dt { color:#5e5e5e } .saa dd { margin:0; word-break:break-word }
 `;
 
 const when = (ms) => new Date(ms).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
