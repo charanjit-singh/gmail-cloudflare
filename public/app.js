@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-let zones = [], catchAll = null, config = {};
+let zones = [], catchAll = null, config = {}, verified = [];
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const zone = () => zones.find((z) => z.id === $("zone").value);
@@ -34,7 +34,7 @@ async function init() {
   config = await api("/config");
   $("login").hidden = true;
   $("app").hidden = false;
-  $("dest").value = config.defaultDestination || "";
+  $("dest").placeholder = config.defaultDestination || "abcd@gmail.com";
   zones = await api("/zones");
   $("zone").innerHTML = zones.map((z) => `<option value="${z.id}">${esc(z.name)}</option>`).join("");
   await loadDestinations();
@@ -44,9 +44,14 @@ async function init() {
 async function loadDestinations() {
   const list = await api("/destinations?account=" + zone().accountId);
   $("destList").innerHTML = list.map((d) =>
-    `<div class="row"><span>${esc(d.email)}</span>` +
-    `<span class="pill ${d.verified ? "ok" : "bad"}">${d.verified ? "verified" : "pending verification"}</span></div>`
-  ).join("") || '<div class="mute">No destination addresses yet.</div>';
+    `<div class="row between"><span>${esc(d.email)} ` +
+    `<span class="pill ${d.verified ? "ok" : "bad"}">${d.verified ? "verified" : "pending verification"}</span></span>` +
+    `<button class="ghost" data-deldest="${d.tag}">Remove</button></div>`
+  ).join("") || '<div class="mute">No inboxes yet.</div>';
+  verified = list.filter((d) => d.verified).map((d) => d.email);
+  const opts = verified.map((e) => `<option>${esc(e)}</option>`).join("") || "<option value=''>no verified inbox</option>";
+  $("aliasDest").innerHTML = opts;
+  $("catchDest").innerHTML = opts;
 }
 
 async function loadZone() {
@@ -62,6 +67,7 @@ async function loadZone() {
   if (!s.enabled) return;
   catchAll = await api(`/zones/${z.id}/catch-all`);
   const dest = catchAll.actions?.[0]?.value?.[0];
+  if (dest && verified.includes(dest)) $("catchDest").value = dest;
   $("catchState").innerHTML = catchAll.enabled && catchAll.actions?.[0]?.type === "forward"
     ? `<span class="ok">On</span> - everything@${esc(z.name)} goes to ${esc(dest)}`
     : '<span class="mute">Off</span>';
@@ -79,22 +85,29 @@ async function loadRules() {
 $("loginBtn").onclick = run(async () => { localStorage.pw = $("pw").value; await init(); });
 $("zone").onchange = run(async () => { await loadDestinations(); await loadZone(); });
 $("addDest").onclick = run(async () => {
-  await api("/destinations", "POST", { account: zone().accountId, email: $("dest").value });
+  await api("/destinations", "POST", { account: zone().accountId, email: $("dest").value || config.defaultDestination });
+  $("dest").value = "";
   toast("Verification email sent. Check your inbox.");
   await loadDestinations();
 });
 $("enable").onclick = run(async () => { await api(`/zones/${zone().id}/enable`, "POST"); await loadZone(); });
 $("toggleCatch").onclick = run(async () => {
   const on = catchAll.enabled && catchAll.actions?.[0]?.type === "forward";
-  await api(`/zones/${zone().id}/catch-all`, "PUT", { enabled: !on, destination: $("dest").value });
+  await api(`/zones/${zone().id}/catch-all`, "PUT", { enabled: !on, destination: $("catchDest").value });
   await loadZone();
 });
 $("addAlias").onclick = run(async () => {
   const local = $("alias").value.trim();
   if (!local) return;
-  await api(`/zones/${zone().id}/rules`, "POST", { alias: `${local}@${zone().name}`, destination: $("dest").value });
+  await api(`/zones/${zone().id}/rules`, "POST", { alias: `${local}@${zone().name}`, destination: $("aliasDest").value });
   $("alias").value = "";
   await loadRules();
+});
+$("destList").onclick = run(async (e) => {
+  const id = e.target.dataset?.deldest;
+  if (!id || !confirm("Remove this inbox? Rules using it will stop forwarding.")) return;
+  await api(`/destinations?account=${zone().accountId}&id=${id}`, "DELETE");
+  await loadDestinations();
 });
 $("rules").onclick = run(async (e) => {
   const id = e.target.dataset?.del;

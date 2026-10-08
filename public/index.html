@@ -37,11 +37,11 @@
 
   <div id="app" hidden>
     <div class="card">
-      <h2>1. Destination inbox</h2>
-      <p class="mute">Cloudflare must verify this address once. Click the link in the email it sends.</p>
+      <h2>1. Inboxes you forward to</h2>
+      <p class="mute">Add each real inbox (e.g. your Gmail). Cloudflare emails a verification link once per address.</p>
       <div class="row">
         <input id="dest" type="email" class="grow" placeholder="abcd@gmail.com">
-        <button id="addDest">Add / re-send verification</button>
+        <button id="addDest">Add inbox</button>
       </div>
       <div id="destList"></div>
     </div>
@@ -58,19 +58,22 @@
     <div id="zoneArea" hidden>
       <div class="card">
         <h2>3. Catch-all</h2>
-        <p class="mute">Forward every address on the domain to your destination.</p>
-        <div class="row between">
-          <span id="catchState"></span>
+        <p class="mute">Forward every address on the domain that has no alias below.</p>
+        <div class="row">
+          <span id="catchState" class="grow"></span>
+          <select id="catchDest"></select>
           <button id="toggleCatch">Toggle</button>
         </div>
       </div>
 
       <div class="card">
-        <h2>4. Aliases</h2>
+        <h2>4. Special addresses</h2>
+        <p class="mute">Specific addresses, each forwarded to the inbox you pick. They take priority over the catch-all.</p>
         <div class="row">
           <input id="alias" class="grow" placeholder="hello">
           <span id="atDomain" class="mute"></span>
-          <button id="addAlias">Add alias</button>
+          <select id="aliasDest"></select>
+          <button id="addAlias">Add</button>
         </div>
         <div id="rules"></div>
       </div>

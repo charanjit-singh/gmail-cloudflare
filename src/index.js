@@ -70,6 +70,11 @@ async function route(request, env, url) {
     }));
   }
 
+  if (p === "/api/destinations" && m === "DELETE") {
+    const account = url.searchParams.get("account");
+    return json(await cf(env, `/accounts/${account}/email/routing/addresses/${url.searchParams.get("id")}`, { method: "DELETE" }));
+  }
+
   if ((parts = p.match(/^\/api\/zones\/([a-f0-9]+)\/(status|enable|rules|catch-all)$/))) {
     const [, zone, what] = parts;
     const base = `/zones/${zone}/email/routing`;
