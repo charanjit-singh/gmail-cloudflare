@@ -1,49 +1,45 @@
 # gmail-cloudflare
 
-Receive on a custom domain, read and send from your everyday Gmail.
+Receive on your own domain, read and send from your everyday Gmail. One Cloudflare token, no other services.
 
-- **Receive:** Cloudflare Email Routing forwards `anything@yourdomain.com` to `abcd@gmail.com`.
-- **Dashboard:** a small Cloudflare Worker + static page to verify your Gmail, enable routing, set a catch-all and manage aliases.
-- **Send:** a Gmail Add-on (side panel, works on web and mobile) lets you compose or reply from your domain address. It posts to the Worker, which sends through Cloudflare's email sending API.
+| Part | What it does |
+| --- | --- |
+| Cloudflare Email Routing | Forwards `anything@yourdomain.com` to `abcd@gmail.com` |
+| Dashboard (`public/`) | Manage inboxes, a catch-all and special addresses |
+| Worker (`src/index.js`) | Serves the dashboard, proxies the Cloudflare API, sends mail via Cloudflare Email Sending |
+| Gmail Add-on (`addon/`) | "Send via custom domain" action in Gmail compose, plus a side panel to compose or reply from your domain address |
 
 ```
-src/index.js    Worker: Cloudflare API proxy + /api/send
-public/         Dashboard (served by the same Worker)
-addon/          Gmail Add-on (Apps Script)
+Incoming:  sender -> you@yourdomain.com -> Cloudflare Email Routing -> abcd@gmail.com
+Outgoing:  Gmail add-on -> Worker /api/send -> Cloudflare Email Sending -> recipient
 ```
 
-## Setup
+## Dashboard
 
-1. `npm install`
-2. Create a Cloudflare API token with:
-   - Account: Email Routing Addresses: Edit
-   - Zone: Email Routing Rules: Edit
-   - Zone: Zone Settings: Edit, DNS: Edit (needed to enable routing)
-   - Zone: Zone: Read
-   - Account: Email Sending: Edit (to send mail)
-3. Edit `DEFAULT_DESTINATION` in `wrangler.toml`.
-4. Set secrets and deploy:
-   ```
-   npx wrangler secret put CF_API_TOKEN
-   npx wrangler secret put ADMIN_PASSWORD
-   npx wrangler deploy
-   ```
-5. Open the Worker URL, sign in, add your Gmail as a destination (click the verification link Cloudflare emails you), pick the domain, enable routing, add aliases or the catch-all.
+1. **Inboxes you forward to** - add real inboxes (verified once by email), remove them later.
+2. **Domain** - pick a zone and enable Email Routing.
+3. **Catch-all** - on/off, with a dropdown for which verified inbox gets everything else.
+4. **Special addresses** - e.g. `billing@`, each forwarded to the inbox you pick. They win over the catch-all.
 
-## Sending
+## Quick start
 
-1. In the Cloudflare dashboard, onboard your domain for sending (Email Service > Email Sending). Cloudflare adds the SPF/DKIM records. Sending uses the same token as above, so there is nothing else to sign up for.
-2. Go to [script.google.com](https://script.google.com), create a project, enable "Show appsscript.json" in Project Settings, and paste in `addon/Code.gs` and `addon/appsscript.json`.
-3. Deploy > Test deployments > Install (Gmail Add-on). Later you can publish it privately.
-4. In Gmail, open the "Send as alias" icon in the right side panel, then Settings: Worker URL, admin password, From address (e.g. `Me <hello@yourdomain.com>`).
-5. In a normal Gmail compose window, open the add-on menu in the compose toolbar (the add-on icon at the bottom of the compose window) and click **Send via custom domain**. It sends the auto-saved draft (subject, body, attachments) from your alias and deletes the draft. You can also compose in the side panel, or open any message and reply from the alias. Replies land on your domain and are forwarded to Gmail.
+See [SETUP.md](SETUP.md) for the full walkthrough. In short:
 
-## Notes
+```
+npm install
+npx wrangler secret put CF_API_TOKEN
+npx wrangler secret put ADMIN_PASSWORD
+npx wrangler deploy
+```
 
-- Add-ons cannot read the live compose box, so the button uses the most recent auto-saved draft. Wait a few seconds after typing before clicking.
-- A button directly beside Gmail's own Send is not possible with an add-on (only a browser extension can do that). The add-on action lives in the compose window's add-on menu. If Gmail insists on showing a card for it, that is a Google limitation and the fallback is the side panel form.
+Then open the Worker URL, add your Gmail, enable routing, and install the add-on from `addon/`.
+
+## Limits
+
+- Add-ons cannot read the live compose box, so the compose action sends the most recent auto-saved draft. Wait a few seconds after typing.
+- An add-on cannot place a button next to Gmail's own Send. The action lives in the compose window's add-on menu.
 - Replies sent this way are not threaded in the recipient's client (no In-Reply-To header yet).
-- Alternative to the add-on: Gmail's built-in Settings > Accounts > "Send mail as" with any SMTP provider.
-- Email Routing needs the domain's DNS on Cloudflare. It replaces existing MX records.
-- The Worker is protected by a single shared password. For stricter access put it behind Cloudflare Access.
-- Local dev: put secrets in `.dev.vars`, run `npm run dev`.
+- Email Routing needs the domain's DNS on Cloudflare and replaces existing MX records.
+- Email Sending is a newer Cloudflare product. Check what your plan allows.
+- The Worker uses one shared password. For stricter access, put it behind Cloudflare Access.
+- Alternative with no code: Gmail's Settings > Accounts > "Send mail as" with any SMTP provider.
