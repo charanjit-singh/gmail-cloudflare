@@ -71,7 +71,12 @@ function activate(element, handler) {
   element.addEventListener("keydown", (event) => (event.key === "Enter" || event.key === " ") && (event.preventDefault(), handler()));
 }
 
-const composeRootOf = (send) => send.closest('div[role="dialog"]') || send.closest("form") || send.closest(".M9, .iN, .nH");
+// The smallest ancestor of Send that also holds the message body: the pop-up window or the in-thread reply box.
+function composeRootOf(send) {
+  let root = send.parentElement;
+  while (root && !root.querySelector(BODY)) root = root.parentElement;
+  return root || document.body;
+}
 
 function closeMenu() {
   menu?.remove();
@@ -134,8 +139,24 @@ async function sendWithCurrent(split, root) {
   send(split, root, current);
 }
 
-const emailsOf = (root, name) =>
-  [...root.querySelectorAll(`input[name="${name}"]`)].map((input) => (input.value.match(EMAIL_PATTERN) || [])[0]).filter(Boolean);
+const firstEmail = (text) => (String(text || "").match(EMAIL_PATTERN) || [])[0];
+const CHIP = "[data-hovercard-id], [email]";
+const chipEmail = (chip) => firstEmail(chip.getAttribute("data-hovercard-id") || chip.getAttribute("email"));
+
+// Gmail keeps recipients in hidden inputs (pop-up compose) or only as chips (in-thread replies), depending on the layout.
+function emailsOf(root, name) {
+  const fromInputs = [...root.querySelectorAll(`input[name="${name}"]`)].map((input) => firstEmail(input.value));
+  const fromChips = [...root.querySelectorAll(`[name="${name}"] :is(${CHIP})`)].map(chipEmail);
+  const found = [...fromInputs, ...fromChips].filter(Boolean);
+  if (found.length || name !== "to") return [...new Set(found)];
+  return [...new Set(recipientChipsOutsideCopies(root).map(chipEmail).filter(Boolean))];
+}
+
+function recipientChipsOutsideCopies(root) {
+  return [...root.querySelectorAll(CHIP)].filter(
+    (chip) => !chip.closest('[name="cc"], [name="bcc"]') && !chip.closest(BODY) && !chip.closest(".gmail_quote")
+  );
+}
 
 function readDraft(root) {
   const body = root.querySelector(BODY);

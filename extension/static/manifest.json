@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Send as alias for Gmail",
   "description": "Send from your own domain addresses in Gmail and browse everything you sent as an alias.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "icons": {
     "128": "icon.png"
   },
