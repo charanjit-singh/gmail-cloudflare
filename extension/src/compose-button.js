@@ -71,72 +71,13 @@ function activate(element, handler) {
   element.addEventListener("keydown", (event) => (event.key === "Enter" || event.key === " ") && (event.preventDefault(), handler()));
 }
 
-// The smallest ancestor of Send that also holds the message body: the pop-up window or the in-thread reply box.
+// Gmail wraps every compose (pop-up or in-thread reply) in [data-compose-id]; recipients and body sit in different tables inside it.
 function composeRootOf(send) {
+  const container = send.closest("[data-compose-id], div[role='dialog']");
+  if (container) return container;
   let root = send.parentElement;
   while (root && !root.querySelector(BODY)) root = root.parentElement;
   return root || document.body;
-}
-
-function closeMenu() {
-  menu?.remove();
-  menu = null;
-}
-
-const accountRow = (account, index, isCurrent) =>
-  `<button class="saa-item" role="menuitem" data-index="${index}">` +
-  `<span class="saa-avatar" style="background:${avatarColor(account.email)}">${escapeHtml(account.label[0].toUpperCase())}</span>` +
-  `<span class="saa-text"><b>${escapeHtml(account.label.split(" · ")[0])}</b><span>${escapeHtml(account.email)}</span></span>` +
-  `<span class="saa-check">${isCurrent ? CHECK : ""}</span></button>`;
-
-async function openMenu(split, root) {
-  chrome.runtime.sendMessage({ type: "sync-accounts" });
-  const { accounts, current } = await currentAccount();
-  if (!accounts.length) return chrome.runtime.sendMessage({ type: "open-options" });
-  menu = document.createElement("div");
-  menu.className = "saa-menu";
-  menu.setAttribute("role", "menu");
-  menu.innerHTML =
-    '<div class="saa-menu-title">Send from</div>' +
-    accounts.map((account, index) => accountRow(account, index, account === current)).join("") +
-    '<div class="saa-divider"></div><button class="saa-item saa-link" data-action="archive">Sent mail</button>' +
-    '<button class="saa-item saa-link" data-action="options">Manage addresses</button>';
-  document.body.append(menu);
-  placeMenu(split);
-  menu.addEventListener("click", (event) => onMenuClick(event, split, root, accounts));
-  menu.addEventListener("keydown", moveFocus);
-  menu.querySelector(".saa-item").focus();
-}
-
-function placeMenu(split) {
-  const rect = split.getBoundingClientRect();
-  const height = menu.offsetHeight;
-  const top = rect.top - height - 8 > 0 ? rect.top - height - 8 : rect.bottom + 8;
-  menu.style.top = top + "px";
-  menu.style.left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8) + "px";
-}
-
-function moveFocus(event) {
-  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-  event.preventDefault();
-  const items = [...menu.querySelectorAll(".saa-item")];
-  const step = event.key === "ArrowDown" ? 1 : -1;
-  items[(items.indexOf(document.activeElement) + step + items.length) % items.length].focus();
-}
-
-function onMenuClick(event, split, root, accounts) {
-  const item = event.target.closest(".saa-item");
-  if (!item) return;
-  closeMenu();
-  if (item.dataset.action === "archive") return chrome.runtime.sendMessage({ type: "open-archive" });
-  if (item.dataset.action === "options") return chrome.runtime.sendMessage({ type: "open-options" });
-  send(split, root, accounts[Number(item.dataset.index)]);
-}
-
-async function sendWithCurrent(split, root) {
-  const { current } = await currentAccount();
-  if (!current) return chrome.runtime.sendMessage({ type: "open-options" });
-  send(split, root, current);
 }
 
 const firstEmail = (text) => (String(text || "").match(EMAIL_PATTERN) || [])[0];
@@ -178,7 +119,8 @@ function readDraft(root) {
     to: emailsOf(root, "to"),
     cc: emailsOf(root, "cc"),
     bcc: emailsOf(root, "bcc"),
-    subject: root.querySelector('input[name="subjectbox"]')?.value || "",
+    // In a reply the visible subject box stays empty; Gmail keeps "Re: …" in a hidden field.
+    subject: root.querySelector('input[name="subjectbox"]')?.value || root.querySelector('input[name="subject"]')?.value || "",
     text: body?.innerText || "",
     html: body?.innerHTML || "",
     hasAttachments: Boolean(root.querySelector(ATTACHMENT_CHIP)),
@@ -202,7 +144,11 @@ function setBusy(split, busy) {
 // In an open conversation Gmail tags the subject with the thread ID the Gmail API understands.
 function threadIdOf(root) {
   if (root.closest('div[role="dialog"]')) return null;
-  return document.querySelector("h2[data-legacy-thread-id], [data-legacy-thread-id]")?.getAttribute("data-legacy-thread-id") || null;
+  return (
+    root.querySelector('input[name="lts"]')?.value ||
+    document.querySelector("h2[data-legacy-thread-id]")?.getAttribute("data-legacy-thread-id") ||
+    null
+  );
 }
 
 async function send(split, root, account) {
