@@ -50,6 +50,8 @@ Send:     Gmail add-on -> Worker /api/send -> Cloudflare Email Sending -> recipi
 
 About 15 minutes. Full walkthrough in [SETUP.md](SETUP.md).
 
+**Enable first:** turn on the Apps Script API at [script.google.com/home/usersettings](https://script.google.com/home/usersettings). The add-on setup command fails without it.
+
 ```
 npm install
 npx wrangler secret put CF_API_TOKEN

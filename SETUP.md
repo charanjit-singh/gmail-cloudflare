@@ -55,7 +55,7 @@ In the Cloudflare dashboard open Email Service > Email Sending and onboard your 
 
 Automated (uses [clasp](https://github.com/google/clasp), Google's Apps Script CLI):
 
-1. Turn on the Apps Script API once at [script.google.com/home/usersettings](https://script.google.com/home/usersettings).
+1. **Enable first:** turn on the Apps Script API once at [script.google.com/home/usersettings](https://script.google.com/home/usersettings).
 2. Run `npm run addon:setup`. It logs you in, creates the Apps Script project and pushes `addon/` to it. Re-running only pushes.
 3. Run `npm run addon:open`, then Deploy > Test deployments > Install. Installing is the one step with no CLI. Reload Gmail and approve the permissions (external requests, read and compose drafts).
 
