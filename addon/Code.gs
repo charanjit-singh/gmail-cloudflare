@@ -90,15 +90,16 @@ function ensureDomainFilter(domain, labelId, filters) {
 
 function labelExistingMail(domain, labelId) {
   const found = Gmail.Users.Messages.list("me", { q: "to:@" + domain + " OR from:@" + domain, maxResults: BACKFILL_LIMIT });
-  const ids = (found.messages || []).map((message) => message.id);
+  const ids = ((found || {}).messages || []).map((message) => message.id);
   if (ids.length) Gmail.Users.Messages.batchModify({ ids, addLabelIds: [labelId] }, "me");
 }
 
 // Gives every receiving domain a Gmail label and a filter, and labels mail already in the inbox. Returns an error string or null.
 function setupDomainLabels(domains) {
   try {
-    const labels = Gmail.Users.Labels.list("me").labels || [];
-    const filters = Gmail.Users.Settings.Filters.list("me").filter || [];
+    const labels = (Gmail.Users.Labels.list("me") || {}).labels || [];
+    // Gmail returns null, not an empty list, when the account has no filters yet.
+    const filters = (Gmail.Users.Settings.Filters.list("me") || {}).filter || [];
     const ids = {};
     domains.forEach((domain, index) => {
       const label = labels.find((existing) => existing.name === domain) || createDomainLabel(domain, index);
