@@ -1,0 +1,23 @@
+addon/Code.gs
+  s_83d40e3169d15c::t_a9631c65f4d2a1 60-118,229,291,328-330,332,384,388-390
+addon/appsscript.json
+  s_83d40e3169d15c::t_9de635974cb4f5 13-15
+src/index.js
+  s_83d40e3169d15c::t_76105d44f3a776 103-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "839fd9fec21015e8979802c6ae488e50acd1e8e9",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
