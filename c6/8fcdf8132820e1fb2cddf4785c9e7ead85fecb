@@ -1,0 +1,25 @@
+extension/src/archive-list.js
+  s_83d40e3169d15c::t_fac6d7ed817530 4-16,18-19
+extension/src/compose-button.js
+  s_83d40e3169d15c::t_e933eaab6435b4 2,6,10,13-14,16,19-21,24-26,29-38,50-72,75-134,136,152-154,158-166,169-176,178-190
+extension/src/compose-styles.js
+  s_83d40e3169d15c::t_d4ec66e4f8fb63 1-39
+extension/static/archive.html
+  s_83d40e3169d15c::t_666f2112569389 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c68fcdf8132820e1fb2cddf4785c9e7ead85fecb",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
