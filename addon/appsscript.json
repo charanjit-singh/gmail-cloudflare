@@ -22,7 +22,7 @@
         { "unconditional": {}, "onTriggerFunction": "onMessage" }
       ],
       "composeTrigger": {
-        "selectActions": [{ "text": "Send as alias", "runFunction": "onCompose" }],
+        "selectActions": [{ "text": "Send via custom domain", "runFunction": "sendDraft" }],
         "draftAccess": "NONE"
       }
     }

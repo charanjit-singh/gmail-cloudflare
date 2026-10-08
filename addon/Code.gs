@@ -7,21 +7,8 @@ function onHome() {
   return props().getProperty("WORKER_URL") ? composeCard({}) : settingsCard();
 }
 
-// Opened from the compose window: a second "Send" button that sends the open draft from the alias.
-function onCompose() {
-  return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle("Send as alias"))
-    .addSection(CardService.newCardSection()
-      .addWidget(CardService.newTextParagraph().setText(
-        "Sends your current draft from <b>" + (props().getProperty("FROM_ADDRESS") || "not set") +
-        "</b> and removes it from Drafts. Wait a few seconds after typing so Gmail can auto-save."))
-      .addWidget(CardService.newTextButton().setText("Send via custom domain")
-        .setOnClickAction(CardService.newAction().setFunctionName("sendDraft")))
-      .addWidget(CardService.newTextButton().setText("Settings")
-        .setOnClickAction(CardService.newAction().setFunctionName("openSettings"))))
-    .build();
-}
-
+// Compose-window action (see composeTrigger in appsscript.json): sends the open draft from the alias.
+// Runs immediately on click, no side panel card.
 function sendDraft(e) {
   const draft = GmailApp.getDrafts().sort((x, y) => y.getMessage().getDate() - x.getMessage().getDate())[0];
   if (!draft) return notify("No draft found. Wait for Gmail to auto-save, then try again.");

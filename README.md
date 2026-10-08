@@ -36,11 +36,12 @@ addon/          Gmail Add-on (Apps Script)
 2. Go to [script.google.com](https://script.google.com), create a project, enable "Show appsscript.json" in Project Settings, and paste in `addon/Code.gs` and `addon/appsscript.json`.
 3. Deploy > Test deployments > Install (Gmail Add-on). Later you can publish it privately.
 4. In Gmail, open the "Send as alias" icon in the right side panel, then Settings: Worker URL, admin password, From address (e.g. `Me <hello@yourdomain.com>`).
-5. In a normal Gmail compose window, open the add-on and click **Send via custom domain**. It sends the auto-saved draft (subject, body, attachments) from your alias and deletes the draft. You can also compose in the side panel, or open any message and reply from the alias. Replies land on your domain and are forwarded to Gmail.
+5. In a normal Gmail compose window, open the add-on menu in the compose toolbar (the add-on icon at the bottom of the compose window) and click **Send via custom domain**. It sends the auto-saved draft (subject, body, attachments) from your alias and deletes the draft. You can also compose in the side panel, or open any message and reply from the alias. Replies land on your domain and are forwarded to Gmail.
 
 ## Notes
 
 - Add-ons cannot read the live compose box, so the button uses the most recent auto-saved draft. Wait a few seconds after typing before clicking.
+- A button directly beside Gmail's own Send is not possible with an add-on (only a browser extension can do that). The add-on action lives in the compose window's add-on menu. If Gmail insists on showing a card for it, that is a Google limitation and the fallback is the side panel form.
 - Replies sent this way are not threaded in the recipient's client (no In-Reply-To header yet).
 - Alternative to the add-on: Gmail's built-in Settings > Accounts > "Send mail as" with Resend's SMTP (`smtp.resend.com`, user `resend`, password = API key).
 - Email Routing needs the domain's DNS on Cloudflare. It replaces existing MX records.
