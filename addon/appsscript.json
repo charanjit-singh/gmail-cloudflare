@@ -8,21 +8,32 @@
     "https://www.googleapis.com/auth/gmail.addons.current.action.compose",
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/script.external_request"
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.locale"
   ],
   "addOns": {
     "common": {
       "name": "Send as alias",
       "logoUrl": "https://www.gstatic.com/images/icons/material/system/1x/mail_black_24dp.png",
       "useLocaleFromApp": true,
-      "homepageTrigger": { "runFunction": "onHome" }
+      "homepageTrigger": {
+        "runFunction": "onHome"
+      }
     },
     "gmail": {
       "contextualTriggers": [
-        { "unconditional": {}, "onTriggerFunction": "onMessage" }
+        {
+          "unconditional": {},
+          "onTriggerFunction": "onMessage"
+        }
       ],
       "composeTrigger": {
-        "selectActions": [{ "text": "Send via custom domain", "runFunction": "sendDraft" }],
+        "selectActions": [
+          {
+            "text": "Send via custom domain",
+            "runFunction": "sendDraft"
+          }
+        ],
         "draftAccess": "NONE"
       }
     }

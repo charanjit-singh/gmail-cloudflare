@@ -114,6 +114,7 @@ async function route(request, env, url) {
   if (p === "/api/send" && m === "POST") {
     const { from, to, cc, bcc, subject, text, html, replyTo, attachments } = await request.json();
     if (!from || !to?.length || !subject) return json({ error: "from, to and subject are required" }, 400);
+    if (!text?.trim() && !html?.trim()) return json({ error: "Message is empty. Type something in the Message box and send again." }, 400);
     const [, name, addr] = from.match(/^\s*(?:"?([^"<]*?)"?\s*)?<([^>]+)>\s*$/) || [, "", from.trim()];
     const domain = addr.split("@")[1];
     const [zone] = await cf(env, `/zones?name=${encodeURIComponent(domain)}`);

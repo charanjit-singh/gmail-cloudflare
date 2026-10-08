@@ -8,6 +8,7 @@ if [ ! -f .clasp.json ]; then
   echo "Logging in to Google (a browser window opens)..."
   npx clasp login
   npx clasp create --type standalone --title "Send as alias" --rootDir addon
+  git checkout -- addon/appsscript.json
 fi
 
 npx clasp push -f
