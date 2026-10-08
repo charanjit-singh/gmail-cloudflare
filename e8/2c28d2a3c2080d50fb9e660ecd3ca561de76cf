@@ -1,0 +1,23 @@
+addon/appsscript.json
+  s_83d40e3169d15c::t_0b8f2739425bcd 11-12,19-21,25-28,31-36
+scripts/setup-addon.sh
+  s_83d40e3169d15c::t_4acee3e42b82e7 11
+src/index.js
+  s_83d40e3169d15c::t_381b3635e62960 117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e82c28d2a3c2080d50fb9e660ecd3ca561de76cf",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
