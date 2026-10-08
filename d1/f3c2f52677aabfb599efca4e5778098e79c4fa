@@ -1,0 +1,19 @@
+addon/Code.gs
+  s_83d40e3169d15c::t_3d5bfb835944ab 10-21,24,27-28,82,150,203,226-227,243-245,247,249
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d1f3c2f52677aabfb599efca4e5778098e79c4fa",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "unknown"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
