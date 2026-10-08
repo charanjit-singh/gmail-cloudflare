@@ -1,0 +1,41 @@
+SETUP.md
+  s_d40147a7cbf469::t_77215d37a309de 119-127
+extension/.gitignore
+  s_83d40e3169d15c::t_d14007fc99199e 3-4
+extension/build.mjs
+  s_83d40e3169d15c::t_d1413ab7f28d49 2-3,11,26-46
+extension/src/background.js
+  s_83d40e3169d15c::t_aea35be56b9aa1 1-2,44-55
+extension/src/compose-button.js
+  s_83d40e3169d15c::t_ab9b326512091d 188-193,200-201,203-204,210-212,214-217
+extension/src/gmail-copy.js
+  s_83d40e3169d15c::t_f505becc2b4a11 1-94
+extension/static/manifest.json
+  s_d40147a7cbf469::t_ec16f15f5871eb 5
+src/index.js
+  s_83d40e3169d15c::t_e6120b21a71836 76-82,181,185,202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c7c652cfc9fb31e6b1f89b3071a90d0afbdd32c4",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    },
+    "s_d40147a7cbf469": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad1201fa-f823-47fc-940f-1315c4e35e45",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
