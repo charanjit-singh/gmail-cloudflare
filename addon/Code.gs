@@ -425,3 +425,11 @@ function post(from, payload) {
   if (response.getResponseCode() === 200) return { messageId: body.result && body.result.message_id };
   return { error: body.error || "HTTP " + response.getResponseCode() };
 }
+
+// Run once from the Apps Script editor (Run > authorize) to approve new permissions; test add-ons don't re-prompt.
+function authorize() {
+  Gmail.Users.Labels.list("me");
+  Gmail.Users.Settings.Filters.list("me");
+  UrlFetchApp.getRequest("https://example.com");
+  console.log("All permissions approved.");
+}
