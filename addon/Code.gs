@@ -7,13 +7,24 @@ const lines = (s) => (s || "").split("\n").map((x) => x.trim()).filter(Boolean);
 
 // ---------- Settings and identities ----------
 
+const EMAIL_PATTERN = /[^\s<>,;"]+@[^\s<>,;"]+/;
+
+// Accepts "Name <a@b.com>", "Name · a@b.com" or "a@b.com". Gmail strips <...> from card text, so
+// screens use the "Name · email" label and the Worker gets the "Name <email>" value.
+function parseIdentity(line) {
+  const match = line.match(EMAIL_PATTERN);
+  if (!match) return null;
+  const email = match[0];
+  const name = line.replace(email, " ").replace(/[<>"·|]/g, " ").replace(/\s+/g, " ").trim();
+  return { email, value: name ? name + " <" + email + ">" : email, label: name ? name + " · " + email : email };
+}
+
 function identities() {
   const p = props().getProperties();
-  return lines(p.FROM_ADDRESSES || p.FROM_ADDRESS).map((value) => {
-    const match = value.match(/<([^>]+)>/);
-    return { value, email: match ? match[1] : value };
-  });
+  return lines(p.FROM_ADDRESSES || p.FROM_ADDRESS).map(parseIdentity).filter(Boolean);
 }
+
+const labelFor = (value) => (parseIdentity(value) || { label: value }).label;
 
 const domainOf = (email) => (email.split("@")[1] || "").toLowerCase();
 
@@ -68,7 +79,7 @@ function fromDropdown(selected) {
     .setType(CardService.SelectionInputType.DROPDOWN)
     .setFieldName("from")
     .setTitle("Send from");
-  identities().forEach((identity) => dropdown.addItem(identity.value, identity.value, identity.value === chosen));
+  identities().forEach((identity) => dropdown.addItem(identity.label, identity.value, identity.value === chosen));
   return dropdown;
 }
 
@@ -136,7 +147,7 @@ function send(e) {
   const form = e.formInput;
   const from = chosenFrom(form);
   const error = post(from, { to: list(form.to), cc: list(form.cc), subject: form.subject || "", text: form.body || "" });
-  return error ? notify("Send failed: " + error) : notify("Sent from " + from, true);
+  return error ? notify("Send failed: " + error) : notify("Sent from " + labelFor(from), true);
 }
 
 // ---------- Compose window ----------
@@ -189,7 +200,7 @@ function deliverDraft(draft, from) {
   });
   if (error) return resultCard("Could not send", error, false);
   draft.deleteDraft();
-  return resultCard("Sent", "From " + from + "\nTo " + (message.getTo() || "recipient"), true);
+  return resultCard("Sent", "From " + labelFor(from) + "\nTo " + (message.getTo() || "recipient"), true);
 }
 
 // ---------- Settings ----------
@@ -212,8 +223,8 @@ function settingsCard() {
     );
   }
   addresses
-    .addWidget(textInput("FROM_ADDRESSES", "From addresses, one per line", p.getProperty("FROM_ADDRESSES") || p.getProperty("FROM_ADDRESS"), true))
-    .addWidget(note("Example: BN Habitat <hello@bnhabitat.com>"));
+    .addWidget(textInput("FROM_ADDRESSES", "From addresses, one per line", identities().map((identity) => identity.label).join("\n"), true))
+    .addWidget(note("Example: BN Habitat · hello@bnhabitat.com"));
   const footer = CardService.newFixedFooter().setPrimaryButton(filledButton("Save", action("saveSettings")));
   return CardService.newCardBuilder()
     .setHeader(header("Settings"))
@@ -229,11 +240,13 @@ function saveSettings(e) {
     WORKER_URL: (form.WORKER_URL || "").trim().replace(/\/$/, ""),
     ADMIN_PASSWORD: (form.ADMIN_PASSWORD || "").trim(),
   });
-  const addresses = lines(form.FROM_ADDRESSES);
+  const entered = lines(form.FROM_ADDRESSES);
+  const parsed = entered.map(parseIdentity);
+  if (parsed.some((identity) => !identity)) return notify("Each line needs an email address, like BN Habitat · hello@bnhabitat.com");
   const domains = cloudflareDomains();
-  const unknown = addresses.map((line) => domainOf((line.match(/<([^>]+)>/) || [, line])[1])).filter((domain) => domains.length && !domains.includes(domain));
+  const unknown = parsed.map((identity) => domainOf(identity.email)).filter((domain) => domains.length && !domains.includes(domain));
   if (unknown.length) return notify("Not on your Cloudflare account: " + unknown.join(", ") + ". Add the domain there first.");
-  props().setProperty("FROM_ADDRESSES", addresses.join("\n"));
+  props().setProperty("FROM_ADDRESSES", parsed.map((identity) => identity.value).join("\n"));
   props().deleteProperty("FROM_ADDRESS");
   return notify("Saved", true);
 }
