@@ -1,5 +1,6 @@
 // Gmail Add-on: send mail from your Cloudflare-routed domain addresses.
-// Settings live in User Properties: WORKER_URL, ADMIN_PASSWORD, FROM_ADDRESSES (one per line), LAST_FROM.
+// Settings live in User Properties: WORKER_URL, ADMIN_PASSWORD, LAST_FROM. FROM_ADDRESSES is a local copy of the
+// list kept on the Worker, which the Chrome extension shares.
 
 const props = () => PropertiesService.getUserProperties();
 const list = (s) => (s || "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
@@ -27,8 +28,6 @@ function identities() {
 
 const labelFor = (value) => (parseIdentity(value) || { label: value }).label;
 
-const domainOf = (email) => (email.split("@")[1] || "").toLowerCase();
-
 // Domains the Worker's Cloudflare token can send from. Empty when the Worker is unreachable.
 function cloudflareDomains() {
   const p = props().getProperties();
@@ -44,6 +43,34 @@ function cloudflareDomains() {
     console.error("Could not load domains: " + error);
     return [];
   }
+}
+
+// Calls the Worker. Returns { status, body }, with status 0 when it cannot be reached.
+function workerRequest(method, path, body) {
+  const p = props().getProperties();
+  if (!p.WORKER_URL || !p.ADMIN_PASSWORD) return { status: 0, body: {} };
+  try {
+    const response = UrlFetchApp.fetch(p.WORKER_URL + path, {
+      method,
+      contentType: "application/json",
+      headers: { Authorization: "Bearer " + p.ADMIN_PASSWORD },
+      muteHttpExceptions: true,
+      payload: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: response.getResponseCode(), body: JSON.parse(response.getContentText() || "{}") };
+  } catch (error) {
+    console.error("Worker request failed: " + error);
+    return { status: 0, body: {} };
+  }
+}
+
+// Pulls the shared address list. If the Worker has none yet, uploads this add-on's list once.
+function syncAddresses() {
+  const remote = workerRequest("get", "/api/addresses");
+  if (remote.status !== 200) return;
+  const local = identities().map((identity) => identity.value);
+  if (remote.body.addresses.length) props().setProperty("FROM_ADDRESSES", remote.body.addresses.join("\n"));
+  else if (local.length) workerRequest("put", "/api/addresses", { addresses: local });
 }
 
 function chosenFrom(formInput) {
@@ -103,11 +130,13 @@ function resultCard(title, detail, ok) {
 // ---------- Entry points ----------
 
 function onHome() {
+  syncAddresses();
   return props().getProperty("WORKER_URL") && identities().length ? composeCard({}) : settingsCard();
 }
 
 // Opened on a message: reply to the sender from one of your addresses.
 function onMessage(e) {
+  syncAddresses();
   GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
   const message = GmailApp.getMessageById(e.gmail.messageId);
   const subject = message.getSubject();
@@ -160,6 +189,7 @@ function send(e) {
 
 // Compose-window action (see composeTrigger in appsscript.json): pick an account, tap it, sent.
 function sendDraft() {
+  syncAddresses();
   const accounts = identities();
   if (!accounts.length) return resultCard("Set up your addresses", "Open the add-on and save at least one From address in Settings.", false);
   const draft = GmailApp.getDrafts().sort((x, y) => y.getMessage().getDate() - x.getMessage().getDate())[0];
@@ -267,6 +297,7 @@ function openSettings() {
 }
 
 function settingsCard() {
+  syncAddresses();
   const p = props();
   const domains = cloudflareDomains();
   const connection = CardService.newCardSection()
@@ -297,15 +328,14 @@ function saveSettings(e) {
     WORKER_URL: (form.WORKER_URL || "").trim().replace(/\/$/, ""),
     ADMIN_PASSWORD: (form.ADMIN_PASSWORD || "").trim(),
   });
-  const entered = lines(form.FROM_ADDRESSES);
-  const parsed = entered.map(parseIdentity);
+  const parsed = lines(form.FROM_ADDRESSES).map(parseIdentity);
   if (parsed.some((identity) => !identity)) return notify("Each line needs an email address, like BN Habitat · hello@bnhabitat.com");
-  const domains = cloudflareDomains();
-  const unknown = parsed.map((identity) => domainOf(identity.email)).filter((domain) => domains.length && !domains.includes(domain));
-  if (unknown.length) return notify("Not on your Cloudflare account: " + unknown.join(", ") + ". Add the domain there first.");
-  props().setProperty("FROM_ADDRESSES", parsed.map((identity) => identity.value).join("\n"));
+  const addresses = parsed.map((identity) => identity.value);
+  const saved = workerRequest("put", "/api/addresses", { addresses });
+  if (saved.status !== 200) return notify(saved.body.error || "Couldn't reach the Worker. Check the URL and password.");
+  props().setProperty("FROM_ADDRESSES", addresses.join("\n"));
   props().deleteProperty("FROM_ADDRESS");
-  return notify("Saved", true);
+  return notify("Saved. The Chrome extension picks this up too.", true);
 }
 
 // ---------- Worker ----------

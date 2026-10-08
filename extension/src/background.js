@@ -16,9 +16,27 @@ async function callWorker({ path, method, body }) {
   }
 }
 
+// Pulls the shared address list. If the Worker has none yet, uploads this extension's list once.
+async function syncAddresses() {
+  const remote = await callWorker({ path: "/addresses", method: "GET" });
+  if (!remote.ok) return remote;
+  const { addresses: local } = await chrome.storage.local.get({ addresses: "" });
+  if (remote.data.addresses.length) {
+    const shared = remote.data.addresses.join("\n");
+    if (shared !== local) await chrome.storage.local.set({ addresses: shared });
+    return { ok: true };
+  }
+  const lines = local.split("\n").map((line) => line.trim()).filter(Boolean);
+  return lines.length ? callWorker({ path: "/addresses", method: "PUT", body: { addresses: lines } }) : { ok: true };
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "api") {
     callWorker(message).then(sendResponse);
+    return true;
+  }
+  if (message?.type === "sync-addresses") {
+    syncAddresses().then(sendResponse);
     return true;
   }
   if (message?.type === "open-options") chrome.runtime.openOptionsPage();

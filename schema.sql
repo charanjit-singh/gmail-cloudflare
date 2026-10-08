@@ -17,3 +17,9 @@ CREATE TABLE IF NOT EXISTS mail (
 CREATE INDEX IF NOT EXISTS mail_created_at ON mail (created_at DESC);
 CREATE INDEX IF NOT EXISTS mail_direction_created_at ON mail (direction, created_at DESC);
 CREATE INDEX IF NOT EXISTS mail_from_created_at ON mail (from_address, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);

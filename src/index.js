@@ -1,4 +1,5 @@
 import { saveSentMail, listMail, getMail } from "./mail-store.js";
+import { getAddresses, saveAddresses, normalizeAddress } from "./settings-store.js";
 
 const CF = "https://api.cloudflare.com/client/v4";
 
@@ -95,6 +96,20 @@ async function route(request, env, url) {
   if (p === "/api/zones" && m === "GET") {
     const zones = await cf(env, "/zones?per_page=50");
     return json(zones.map((z) => ({ id: z.id, name: z.name, accountId: z.account.id })));
+  }
+
+  if (p === "/api/addresses" && m === "GET") return json(await getAddresses(env));
+
+  if (p === "/api/addresses" && m === "PUT") {
+    const { addresses } = await request.json();
+    const parsed = (Array.isArray(addresses) ? addresses : []).map(normalizeAddress);
+    if (parsed.some((address) => !address)) {
+      return json({ error: "Each address needs an email, like BN Habitat · hello@bnhabitat.com" }, 400);
+    }
+    const domains = (await cf(env, "/zones?per_page=50")).map((zone) => zone.name.toLowerCase());
+    const unknown = [...new Set(parsed.map((address) => address.email.split("@")[1].toLowerCase()))].filter((domain) => !domains.includes(domain));
+    if (unknown.length) return json({ error: `Not on your Cloudflare account: ${unknown.join(", ")}. Add the domain there first.` }, 400);
+    return json(await saveAddresses(env, parsed.map((address) => address.value)));
   }
 
   if (p === "/api/destinations" && m === "GET") {
