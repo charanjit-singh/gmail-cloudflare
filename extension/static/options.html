@@ -5,26 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Send as alias settings</title>
 <style>
-  body { font:15px/1.5 system-ui,sans-serif; max-width:560px; margin:32px auto; padding:0 16px; color:#202124 }
-  label { display:block; margin:16px 0 4px; font-weight:600 }
-  input, textarea { width:100%; padding:8px 10px; border:1px solid #dadce0; border-radius:8px; font:inherit; box-sizing:border-box }
-  .hint { color:#5f6368; font-size:13px; margin-top:4px }
-  button { margin:16px 8px 0 0; padding:8px 16px; border:0; border-radius:18px; background:#1a73e8; color:#fff; font:inherit; cursor:pointer }
-  button.quiet { background:#e8f0fe; color:#1a73e8 }
-  #status { margin-top:16px; min-height:1.5em }
+  body { font:14px/20px "Google Sans",Roboto,Arial,sans-serif; max-width:520px; margin:40px auto; padding:0 16px; color:#1f1f1f; background:#f6f8fc }
+  h1 { font-size:22px; font-weight:400; margin:0 0 4px }
+  .lead { color:#5e5e5e; margin:0 0 20px }
+  .card { background:#fff; border-radius:16px; padding:20px }
+  label { display:block; margin:12px 0 4px; font-weight:500 }
+  input { width:100%; box-sizing:border-box; height:44px; padding:0 14px; border:1px solid #c4c7c5; border-radius:8px; font:inherit; outline:none }
+  input:focus { border:2px solid #0b57d0; padding:0 13px }
+  .actions { display:flex; gap:8px; margin-top:20px }
+  button, .link { height:40px; padding:0 24px; border:0; border-radius:20px; font:500 14px "Google Sans",Roboto,Arial,sans-serif; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center }
+  button { background:#0b57d0; color:#fff }
+  .link { background:#fff; color:#0b57d0; border:1px solid #747775 }
+  #status { margin-top:16px; min-height:20px; color:#5e5e5e }
+  h2 { font-size:16px; font-weight:500; margin:24px 0 8px }
+  .account { display:flex; align-items:center; gap:12px; padding:8px 0; border-top:1px solid #f1f3f4 }
+  .avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:500 }
+  .account small { display:block; color:#5e5e5e }
 </style>
 </head>
 <body>
 <h1>Send as alias</h1>
-<label for="workerUrl">Worker URL</label>
-<input id="workerUrl" placeholder="https://gmail-cloudflare.you.workers.dev">
-<label for="password">Admin password</label>
-<input id="password" type="password" autocomplete="off">
-<label for="addresses">From addresses, one per line</label>
-<textarea id="addresses" rows="5" placeholder="BN Habitat · hello@bnhabitat.com"></textarea>
-<div class="hint">Format: Name · address@yourdomain.com. Addresses must be on a domain in your Cloudflare account.</div>
-<button id="save">Save</button><button id="test" class="quiet">Test connection</button>
-<div id="status"></div>
+<p class="lead">Connect to your Worker. Your sending accounts load from it automatically.</p>
+<div class="card">
+  <label for="workerUrl">Worker URL</label>
+  <input id="workerUrl" placeholder="https://gmail-cloudflare.bnhabitat.workers.dev" autocomplete="off">
+  <label for="password">Admin password</label>
+  <input id="password" type="password" autocomplete="off">
+  <div class="actions"><button id="save">Connect</button><a id="manage" class="link" target="_blank" hidden>Manage accounts</a></div>
+  <div id="status"></div>
+  <div id="accounts"></div>
+</div>
 <script src="options.js"></script>
 </body>
 </html>

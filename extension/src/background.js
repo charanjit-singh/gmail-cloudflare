@@ -16,18 +16,18 @@ async function callWorker({ path, method, body }) {
   }
 }
 
-// Pulls the shared address list. If the Worker has none yet, uploads this extension's list once.
-async function syncAddresses() {
-  const remote = await callWorker({ path: "/addresses", method: "GET" });
+// Loads the accounts from the Worker and caches them. Uploads this extension's old list once if the Worker has none.
+async function syncAccounts() {
+  const remote = await callWorker({ path: "/accounts", method: "GET" });
   if (!remote.ok) return remote;
   const { addresses: local } = await chrome.storage.local.get({ addresses: "" });
-  if (remote.data.addresses.length) {
-    const shared = remote.data.addresses.join("\n");
-    if (shared !== local) await chrome.storage.local.set({ addresses: shared });
-    return { ok: true };
+  const localLines = local.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (!remote.data.accounts.length && localLines.length) {
+    return callWorker({ path: "/accounts", method: "PUT", body: { accounts: localLines } });
   }
-  const lines = local.split("\n").map((line) => line.trim()).filter(Boolean);
-  return lines.length ? callWorker({ path: "/addresses", method: "PUT", body: { addresses: lines } }) : { ok: true };
+  const shared = remote.data.accounts.map((account) => account.value).join("\n");
+  if (shared !== local) await chrome.storage.local.set({ addresses: shared });
+  return remote;
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -35,8 +35,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     callWorker(message).then(sendResponse);
     return true;
   }
-  if (message?.type === "sync-addresses") {
-    syncAddresses().then(sendResponse);
+  if (message?.type === "sync-accounts") {
+    syncAccounts().then(sendResponse);
     return true;
   }
   if (message?.type === "open-options") chrome.runtime.openOptionsPage();

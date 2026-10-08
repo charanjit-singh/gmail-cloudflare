@@ -1,4 +1,4 @@
-const ADDRESSES_KEY = "from_addresses";
+const ACCOUNTS_KEY = "from_addresses";
 const EMAIL_PATTERN = /[^\s<>,;"]+@[^\s<>,;"]+/;
 
 function database(env) {
@@ -12,22 +12,23 @@ export function normalizeAddress(line) {
   if (!match) return null;
   const email = match[0];
   const name = String(line).replace(email, " ").replace(/[<>"·|]/g, " ").replace(/\s+/g, " ").trim();
-  return { email, value: name ? `${name} <${email}>` : email };
+  return { name, email, value: name ? `${name} <${email}>` : email };
 }
 
-export async function getAddresses(env) {
-  const row = await database(env).prepare("SELECT value, updated_at FROM settings WHERE key = ?").bind(ADDRESSES_KEY).first();
-  return { addresses: row ? JSON.parse(row.value) : [], updatedAt: row ? row.updated_at : null };
+export async function getAccounts(env) {
+  const row = await database(env).prepare("SELECT value, updated_at FROM settings WHERE key = ?").bind(ACCOUNTS_KEY).first();
+  const values = row ? JSON.parse(row.value) : [];
+  return { accounts: values.map(normalizeAddress).filter(Boolean), updatedAt: row ? row.updated_at : null };
 }
 
-export async function saveAddresses(env, addresses) {
+export async function saveAccounts(env, values) {
   const updatedAt = Date.now();
   await database(env)
     .prepare(
       `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
     )
-    .bind(ADDRESSES_KEY, JSON.stringify(addresses), updatedAt)
+    .bind(ACCOUNTS_KEY, JSON.stringify(values), updatedAt)
     .run();
-  return { addresses, updatedAt };
+  return { accounts: values.map(normalizeAddress), updatedAt };
 }

@@ -78,6 +78,10 @@ In Gmail open the "Send as alias" icon in the right side panel > Settings and en
 
 Recipients who reply write to your domain address, which Cloudflare forwards to Gmail.
 
+## Sending accounts
+
+Manage the addresses you send from in the dashboard's **Sending accounts** card. The Gmail add-on and the Chrome extension only need the Worker URL and admin password; they load the accounts from `GET /api/accounts`.
+
 ## Mail archive (optional)
 
 Every message sent through the Worker is saved to a D1 database, and the dashboard shows a **Sent mail** list you can search and open. HTML mail renders in a sandboxed frame.
@@ -109,7 +113,7 @@ npm run build
 ```
 
 1. Open `chrome://extensions`, turn on Developer mode, choose **Load unpacked** and pick `extension/dist`.
-2. Open the extension's options and enter the Worker URL, admin password and From addresses (`Name · address@yourdomain.com`, one per line). **Test connection** checks the domains.
+2. Open the extension's options, enter the Worker URL and admin password, and click **Connect**. Your sending accounts load automatically.
 3. Reload Gmail.
 
 Limits: the button finds Gmail's compose window by its page structure, so a Gmail redesign can break it. It sends text and HTML only; for messages with attachments use the add-on's **Send via custom domain** action.

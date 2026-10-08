@@ -24,7 +24,7 @@ export function registerComposeButton() {
   document.addEventListener("mousedown", (event) => menu && !menu.contains(event.target) && !event.target.closest(".saa-arrow") && closeMenu(), true);
   document.addEventListener("keydown", (event) => event.key === "Escape" && closeMenu(), true);
   chrome.storage.onChanged.addListener(refreshLabels);
-  chrome.runtime.sendMessage({ type: "sync-addresses" });
+  chrome.runtime.sendMessage({ type: "sync-accounts" });
 }
 
 async function currentAccount() {
@@ -85,7 +85,7 @@ const accountRow = (account, index, isCurrent) =>
   `<span class="saa-check">${isCurrent ? CHECK : ""}</span></button>`;
 
 async function openMenu(split, root) {
-  chrome.runtime.sendMessage({ type: "sync-addresses" });
+  chrome.runtime.sendMessage({ type: "sync-accounts" });
   const { accounts, current } = await currentAccount();
   if (!accounts.length) return chrome.runtime.sendMessage({ type: "open-options" });
   menu = document.createElement("div");

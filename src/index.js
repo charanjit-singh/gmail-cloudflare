@@ -1,5 +1,5 @@
 import { saveSentMail, listMail, getMail } from "./mail-store.js";
-import { getAddresses, saveAddresses, normalizeAddress } from "./settings-store.js";
+import { getAccounts, saveAccounts, normalizeAddress } from "./settings-store.js";
 
 const CF = "https://api.cloudflare.com/client/v4";
 
@@ -98,18 +98,21 @@ async function route(request, env, url) {
     return json(zones.map((z) => ({ id: z.id, name: z.name, accountId: z.account.id })));
   }
 
-  if (p === "/api/addresses" && m === "GET") return json(await getAddresses(env));
+  if (p === "/api/accounts" && m === "GET") {
+    const [saved, zones] = await Promise.all([getAccounts(env), cf(env, "/zones?per_page=50")]);
+    return json({ ...saved, domains: zones.map((zone) => zone.name.toLowerCase()) });
+  }
 
-  if (p === "/api/addresses" && m === "PUT") {
-    const { addresses } = await request.json();
-    const parsed = (Array.isArray(addresses) ? addresses : []).map(normalizeAddress);
-    if (parsed.some((address) => !address)) {
-      return json({ error: "Each address needs an email, like BN Habitat · hello@bnhabitat.com" }, 400);
+  if (p === "/api/accounts" && m === "PUT") {
+    const { accounts } = await request.json();
+    const parsed = (Array.isArray(accounts) ? accounts : []).map((account) => normalizeAddress(account?.value ?? account));
+    if (parsed.some((account) => !account)) {
+      return json({ error: "Each account needs an email, like BN Habitat · hello@bnhabitat.com" }, 400);
     }
     const domains = (await cf(env, "/zones?per_page=50")).map((zone) => zone.name.toLowerCase());
-    const unknown = [...new Set(parsed.map((address) => address.email.split("@")[1].toLowerCase()))].filter((domain) => !domains.includes(domain));
+    const unknown = [...new Set(parsed.map((account) => account.email.split("@")[1].toLowerCase()))].filter((domain) => !domains.includes(domain));
     if (unknown.length) return json({ error: `Not on your Cloudflare account: ${unknown.join(", ")}. Add the domain there first.` }, 400);
-    return json(await saveAddresses(env, parsed.map((address) => address.value)));
+    return json({ ...(await saveAccounts(env, parsed.map((account) => account.value))), domains });
   }
 
   if (p === "/api/destinations" && m === "GET") {
@@ -166,8 +169,10 @@ async function route(request, env, url) {
   }
 
   if (p === "/api/send" && m === "POST") {
-    const { from, to, cc, bcc, subject, text, html, replyTo, attachments } = await request.json();
-    if (!from || !to?.length || !subject) return json({ error: "from, to and subject are required" }, 400);
+    let { from, to, cc, bcc, subject, text, html, replyTo, attachments } = await request.json();
+    if (!from) return json({ error: "Pick an account to send from." }, 400);
+    if (!to?.length) return json({ error: "Add at least one recipient in To." }, 400);
+    subject = (subject || "").trim() || "(no subject)";
     if (!text?.trim() && !html?.trim()) return json({ error: "Message is empty. Type something in the Message box and send again." }, 400);
     if (attachmentBytes(attachments) > MAX_MESSAGE_BYTES) {
       return json({ error: "Attachments are over 5 MB in total. Send smaller files or share a link." }, 413);

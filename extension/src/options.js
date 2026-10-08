@@ -1,46 +1,47 @@
-import { api, identitiesFrom, loadSettings } from "./shared.js";
+import { escapeHtml, loadSettings } from "./shared.js";
+import { avatarColor } from "./compose-styles.js";
 
 const $ = (id) => document.getElementById(id);
-const fields = ["workerUrl", "password", "addresses"];
-
 const say = (text) => ($("status").textContent = text);
 
-async function init() {
-  await chrome.runtime.sendMessage({ type: "sync-addresses" });
-  const settings = await loadSettings();
-  fields.forEach((field) => ($(field).value = settings[field]));
+function showAccounts(accounts, workerUrl) {
+  $("manage").hidden = !workerUrl;
+  $("manage").href = workerUrl || "#";
+  $("accounts").innerHTML = accounts.length
+    ? "<h2>Sending accounts</h2>" +
+      accounts
+        .map(
+          (account) =>
+            `<div class="account"><span class="avatar" style="background:${avatarColor(account.email)}">${escapeHtml((account.name || account.email)[0].toUpperCase())}</span>` +
+            `<span>${escapeHtml(account.name || account.email)}<small>${escapeHtml(account.email)}</small></span></div>`
+        )
+        .join("")
+    : "";
 }
 
-async function save() {
-  const values = Object.fromEntries(fields.map((field) => [field, $(field).value.trim()]));
-  const lines = values.addresses.split("\n").map((line) => line.trim()).filter(Boolean);
-  if (identitiesFrom(values.addresses).length !== lines.length) {
-    say("Each From address line needs an email address, like BN Habitat · hello@bnhabitat.com");
-    return false;
+async function connect() {
+  say("Connecting…");
+  const result = await chrome.runtime.sendMessage({ type: "sync-accounts" });
+  const { workerUrl } = await loadSettings();
+  if (!result?.ok) {
+    showAccounts([], workerUrl);
+    return say(result?.error || "No reply from the extension.");
   }
-  await chrome.storage.local.set({ workerUrl: values.workerUrl.replace(/\/$/, ""), password: values.password });
-  const saved = await api("/addresses", "PUT", { addresses: lines });
-  if (!saved?.ok) {
-    say("Not saved: " + (saved?.error || "no reply"));
-    return false;
-  }
-  await chrome.storage.local.set({ addresses: saved.data.addresses.join("\n") });
-  $("addresses").value = saved.data.addresses.join("\n");
-  say("Saved. The Gmail add-on picks this up too.");
-  return true;
+  const accounts = result.data.accounts;
+  say(accounts.length ? `Connected. ${accounts.length} account${accounts.length === 1 ? "" : "s"} loaded.` : "Connected. Add your accounts on the Worker dashboard.");
+  showAccounts(accounts, workerUrl);
 }
 
-async function testConnection() {
-  if (!(await save())) return;
-  const zones = await api("/zones");
-  if (!zones?.ok) return say("Could not connect: " + (zones?.error || "no reply"));
-  const domains = zones.data.map((zone) => zone.name);
-  const unknown = identitiesFrom($("addresses").value)
-    .map((identity) => identity.email.split("@")[1].toLowerCase())
-    .filter((domain) => !domains.includes(domain));
-  say(unknown.length ? "Connected, but not on your Cloudflare account: " + unknown.join(", ") : "Connected. Domains: " + domains.join(", "));
-}
+$("save").addEventListener("click", async () => {
+  const workerUrl = $("workerUrl").value.trim().replace(/\/$/, "");
+  const password = $("password").value.trim();
+  if (!workerUrl || !password) return say("Enter the Worker URL and the admin password.");
+  await chrome.storage.local.set({ workerUrl, password });
+  connect();
+});
 
-$("save").addEventListener("click", save);
-$("test").addEventListener("click", testConnection);
-init();
+loadSettings().then((settings) => {
+  $("workerUrl").value = settings.workerUrl;
+  $("password").value = settings.password;
+  if (settings.workerUrl && settings.password) connect();
+});

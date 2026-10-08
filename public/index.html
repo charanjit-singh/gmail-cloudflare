@@ -46,6 +46,19 @@
   </div>
 
   <div id="app" hidden>
+    <div class="card">
+      <h2>Sending accounts</h2>
+      <p class="mute">The addresses you send from. The Gmail add-on and the Chrome extension load this list automatically.</p>
+      <div class="row">
+        <input id="accountName" class="grow" placeholder="Name, e.g. BN Habitat">
+        <input id="accountLocal" placeholder="hello" style="width:120px">
+        <span class="mute">@</span>
+        <select id="accountDomain"></select>
+        <button id="addAccount">Add account</button>
+      </div>
+      <div id="accountList"></div>
+    </div>
+
     <div class="card" id="mailCard" hidden>
       <h2>Sent mail</h2>
       <div id="mailList">

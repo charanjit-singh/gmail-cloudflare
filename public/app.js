@@ -39,6 +39,7 @@ async function init() {
   $("zone").innerHTML = zones.map((z) => `<option value="${z.id}">${esc(z.name)}</option>`).join("");
   await loadDestinations();
   await loadZone();
+  await loadAccounts();
   if (config.canStoreMail) await showMailCard();
 }
 
@@ -177,3 +178,46 @@ $("mailView").addEventListener("click", (event) => {
 $("mailSearchBtn").addEventListener("click", run(() => loadMail(true)));
 $("mailSearch").addEventListener("keydown", run((event) => event.key === "Enter" && loadMail(true)));
 $("mailMore").addEventListener("click", run(() => loadMail(false)));
+
+// ---------- Sending accounts ----------
+
+let accounts = [];
+
+async function loadAccounts() {
+  const data = await api("/accounts");
+  accounts = data.accounts;
+  $("accountDomain").innerHTML = data.domains.map((domain) => `<option>${esc(domain)}</option>`).join("");
+  renderAccounts();
+}
+
+function renderAccounts() {
+  $("accountList").innerHTML = accounts.map((account, index) =>
+    `<div class="row between"><span>${esc(account.name || account.email)} <span class="mute">${esc(account.email)}</span></span>` +
+    `<button class="ghost" data-delaccount="${index}">Remove</button></div>`
+  ).join("") || '<div class="mute">No accounts yet. Add the first one above.</div>';
+}
+
+async function saveAccountList(list) {
+  const data = await api("/accounts", "PUT", { accounts: list.map((account) => account.value) });
+  accounts = data.accounts;
+  renderAccounts();
+}
+
+$("addAccount").addEventListener("click", run(async () => {
+  const local = $("accountLocal").value.trim().toLowerCase();
+  if (!local) return toast("Type the part before @, like hello.");
+  const email = local + "@" + $("accountDomain").value;
+  if (accounts.some((account) => account.email === email)) return toast(email + " is already in the list.");
+  const name = $("accountName").value.trim();
+  await saveAccountList([...accounts, { value: name ? `${name} <${email}>` : email }]);
+  $("accountLocal").value = "";
+  toast("Added " + email);
+}));
+
+$("accountList").addEventListener("click", run(async (event) => {
+  const button = event.target.closest("[data-delaccount]");
+  if (!button) return;
+  const removed = accounts[Number(button.dataset.delaccount)];
+  await saveAccountList(accounts.filter((account) => account !== removed));
+  toast("Removed " + removed.email);
+}));

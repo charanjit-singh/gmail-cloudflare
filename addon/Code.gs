@@ -1,6 +1,6 @@
 // Gmail Add-on: send mail from your Cloudflare-routed domain addresses.
-// Settings live in User Properties: WORKER_URL, ADMIN_PASSWORD, LAST_FROM. FROM_ADDRESSES is a local copy of the
-// list kept on the Worker, which the Chrome extension shares.
+// You enter only WORKER_URL and ADMIN_PASSWORD. Sending accounts are managed on the Worker dashboard and cached
+// here in FROM_ADDRESSES; LAST_FROM remembers the last account used.
 
 const props = () => PropertiesService.getUserProperties();
 const list = (s) => (s || "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
@@ -28,23 +28,6 @@ function identities() {
 
 const labelFor = (value) => (parseIdentity(value) || { label: value }).label;
 
-// Domains the Worker's Cloudflare token can send from. Empty when the Worker is unreachable.
-function cloudflareDomains() {
-  const p = props().getProperties();
-  if (!p.WORKER_URL || !p.ADMIN_PASSWORD) return [];
-  try {
-    const res = UrlFetchApp.fetch(p.WORKER_URL + "/api/zones", {
-      headers: { Authorization: "Bearer " + p.ADMIN_PASSWORD },
-      muteHttpExceptions: true,
-    });
-    if (res.getResponseCode() !== 200) return [];
-    return JSON.parse(res.getContentText()).map((zone) => zone.name.toLowerCase());
-  } catch (error) {
-    console.error("Could not load domains: " + error);
-    return [];
-  }
-}
-
 // Calls the Worker. Returns { status, body }, with status 0 when it cannot be reached.
 function workerRequest(method, path, body) {
   const p = props().getProperties();
@@ -64,13 +47,17 @@ function workerRequest(method, path, body) {
   }
 }
 
-// Pulls the shared address list. If the Worker has none yet, uploads this add-on's list once.
-function syncAddresses() {
-  const remote = workerRequest("get", "/api/addresses");
-  if (remote.status !== 200) return;
+// Loads the accounts from the Worker and caches them. Uploads this add-on's old list once if the Worker has none.
+function syncAccounts() {
+  const remote = workerRequest("get", "/api/accounts");
+  if (remote.status !== 200) return { error: remote.body.error || "Couldn't reach the Worker. Check the URL and password." };
   const local = identities().map((identity) => identity.value);
-  if (remote.body.addresses.length) props().setProperty("FROM_ADDRESSES", remote.body.addresses.join("\n"));
-  else if (local.length) workerRequest("put", "/api/addresses", { addresses: local });
+  if (!remote.body.accounts.length && local.length) {
+    const uploaded = workerRequest("put", "/api/accounts", { accounts: local });
+    return uploaded.status === 200 ? uploaded.body : { error: uploaded.body.error };
+  }
+  props().setProperty("FROM_ADDRESSES", remote.body.accounts.map((account) => account.value).join("\n"));
+  return remote.body;
 }
 
 function chosenFrom(formInput) {
@@ -130,13 +117,13 @@ function resultCard(title, detail, ok) {
 // ---------- Entry points ----------
 
 function onHome() {
-  syncAddresses();
+  syncAccounts();
   return props().getProperty("WORKER_URL") && identities().length ? composeCard({}) : settingsCard();
 }
 
 // Opened on a message: reply to the sender from one of your addresses.
 function onMessage(e) {
-  syncAddresses();
+  syncAccounts();
   GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
   const message = GmailApp.getMessageById(e.gmail.messageId);
   const subject = message.getSubject();
@@ -189,7 +176,7 @@ function send(e) {
 
 // Compose-window action (see composeTrigger in appsscript.json): pick an account, tap it, sent.
 function sendDraft() {
-  syncAddresses();
+  syncAccounts();
   const accounts = identities();
   if (!accounts.length) return resultCard("Set up your addresses", "Open the add-on and save at least one From address in Settings.", false);
   const draft = GmailApp.getDrafts().sort((x, y) => y.getMessage().getDate() - x.getMessage().getDate())[0];
@@ -297,29 +284,34 @@ function openSettings() {
 }
 
 function settingsCard() {
-  syncAddresses();
   const p = props();
-  const domains = cloudflareDomains();
+  const synced = p.getProperty("WORKER_URL") ? syncAccounts() : null;
   const connection = CardService.newCardSection()
     .setHeader("Connection")
     .addWidget(textInput("WORKER_URL", "Worker URL", p.getProperty("WORKER_URL")))
-    .addWidget(textInput("ADMIN_PASSWORD", "Admin password", p.getProperty("ADMIN_PASSWORD")));
-  const addresses = CardService.newCardSection().setHeader("Sending addresses");
-  if (domains.length) {
-    addresses.addWidget(
-      CardService.newDecoratedText().setTopLabel("Domains you can send from").setText(domains.join(", ")).setStartIcon(icon("EMAIL")).setWrapText(true)
+    .addWidget(textInput("ADMIN_PASSWORD", "Admin password", p.getProperty("ADMIN_PASSWORD")))
+    .addWidget(note("That's all you need. Accounts load from your Worker."));
+  const card = CardService.newCardBuilder().setHeader(header("Settings")).addSection(connection);
+  if (synced) card.addSection(accountsSection(synced));
+  const footer = CardService.newFixedFooter().setPrimaryButton(filledButton("Save", action("saveSettings")));
+  if (p.getProperty("WORKER_URL")) {
+    footer.setSecondaryButton(
+      CardService.newTextButton().setText("Manage accounts").setOpenLink(CardService.newOpenLink().setUrl(p.getProperty("WORKER_URL")))
     );
   }
-  addresses
-    .addWidget(textInput("FROM_ADDRESSES", "From addresses, one per line", identities().map((identity) => identity.label).join("\n"), true))
-    .addWidget(note("Example: BN Habitat · hello@bnhabitat.com"));
-  const footer = CardService.newFixedFooter().setPrimaryButton(filledButton("Save", action("saveSettings")));
-  return CardService.newCardBuilder()
-    .setHeader(header("Settings"))
-    .addSection(connection)
-    .addSection(addresses)
-    .setFixedFooter(footer)
-    .build();
+  return card.setFixedFooter(footer).build();
+}
+
+function accountsSection(synced) {
+  const section = CardService.newCardSection().setHeader("Sending accounts");
+  if (synced.error) return section.addWidget(note(plain(synced.error)));
+  if (!synced.accounts.length) return section.addWidget(note("No accounts yet. Add them on the Worker dashboard."));
+  synced.accounts.forEach((account) => {
+    section.addWidget(
+      CardService.newDecoratedText().setText(plain(account.name || account.email)).setBottomLabel(plain(account.email)).setStartIcon(icon("EMAIL"))
+    );
+  });
+  return section;
 }
 
 function saveSettings(e) {
@@ -328,14 +320,11 @@ function saveSettings(e) {
     WORKER_URL: (form.WORKER_URL || "").trim().replace(/\/$/, ""),
     ADMIN_PASSWORD: (form.ADMIN_PASSWORD || "").trim(),
   });
-  const parsed = lines(form.FROM_ADDRESSES).map(parseIdentity);
-  if (parsed.some((identity) => !identity)) return notify("Each line needs an email address, like BN Habitat · hello@bnhabitat.com");
-  const addresses = parsed.map((identity) => identity.value);
-  const saved = workerRequest("put", "/api/addresses", { addresses });
-  if (saved.status !== 200) return notify(saved.body.error || "Couldn't reach the Worker. Check the URL and password.");
-  props().setProperty("FROM_ADDRESSES", addresses.join("\n"));
   props().deleteProperty("FROM_ADDRESS");
-  return notify("Saved. The Chrome extension picks this up too.", true);
+  const synced = syncAccounts();
+  if (synced.error) return notify(synced.error);
+  const count = synced.accounts.length;
+  return notify("Connected. " + count + " account" + (count === 1 ? "" : "s") + " loaded.", true);
 }
 
 // ---------- Worker ----------
