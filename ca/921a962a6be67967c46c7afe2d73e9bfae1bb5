@@ -1,0 +1,37 @@
+SETUP.md
+  s_83d40e3169d15c::t_156c5caca589fe 81-84,116
+addon/Code.gs
+  s_83d40e3169d15c::t_562253fed63568 2-3,50-53,55-60,120,126,179,288,292-299,302-314,324-327
+extension/src/background.js
+  s_83d40e3169d15c::t_aecdf4e00df16b 19-21,24-26,28-30,38-39
+extension/src/compose-button.js
+  s_83d40e3169d15c::t_272d8f3f0b9bef 27,88
+extension/src/options.js
+  s_83d40e3169d15c::t_c13860c14ec59b 1-2,7-19,22-28,30-32,35-41,43-47
+extension/static/options.html
+  s_83d40e3169d15c::t_c43f038c6826df 8-23,28-37
+public/app.js
+  s_83d40e3169d15c::t_a77e1e729bf035 42,181-223
+public/index.html
+  s_83d40e3169d15c::t_39d26356f0c2f2 49-61
+src/index.js
+  s_83d40e3169d15c::t_2d6f202b00779c 2,101-104,106-110,113,115,172-175
+src/settings-store.js
+  s_83d40e3169d15c::t_6410d342a77498 1,15,18-21,24,31,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ca921a962a6be67967c46c7afe2d73e9bfae1bb5",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
