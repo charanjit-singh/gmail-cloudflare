@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Gmail Send As Alias",
+  "version": "0.1.0",
+  "description": "Send mail from your custom domain address inside Gmail. Replies land in your Gmail via Cloudflare Email Routing.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["https://mail.google.com/*"], "js": ["content.js"], "css": ["content.css"] }
+  ],
+  "options_page": "options.html",
+  "action": { "default_title": "Gmail Send As Alias", "default_popup": "options.html" }
+}

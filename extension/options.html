@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Gmail Send As Alias</title>
+<style>
+  body { font: 14px system-ui, sans-serif; width: 320px; padding: 16px; }
+  label { display: block; margin-top: 10px; font-weight: 600; }
+  input { width: 100%; padding: 6px; box-sizing: border-box; }
+  button { margin-top: 14px; padding: 8px 14px; }
+  small { color: #666; }
+</style>
+<h3>Send as alias</h3>
+<label>Worker URL</label>
+<input id="workerUrl" placeholder="https://gmail-cloudflare.you.workers.dev">
+<label>Admin password</label>
+<input id="password" type="password">
+<label>From address</label>
+<input id="fromAddress" placeholder="Me <hello@yourdomain.com>">
+<small>Must be on a domain verified with your sending provider.</small><br>
+<button id="save">Save</button> <span id="msg"></span>
+<script src="options.js"></script>

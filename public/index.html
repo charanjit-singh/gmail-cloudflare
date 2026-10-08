@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mail Forwarding</title>
+<style>
+  :root { --bg:#f7f7f8; --card:#fff; --fg:#1a1a1a; --mute:#6b7280; --line:#e5e7eb; --accent:#f6821f; --ok:#16a34a; --bad:#dc2626; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111214; --card:#1b1c1f; --fg:#eee; --mute:#9ca3af; --line:#2c2d31; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:20px; } h2 { font-size:16px; margin:0 0 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin:16px 0; }
+  input, select, button { font:inherit; padding:8px 10px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
+  button { background:var(--accent); color:#fff; border:0; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--bad); border:1px solid var(--line); padding:4px 8px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0; }
+  .row.between { justify-content:space-between; }
+  .grow { flex:1; min-width:140px; }
+  .pill { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .mute { color:var(--mute); font-size:13px; }
+  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#222; color:#fff; padding:8px 14px; border-radius:8px; display:none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mail Forwarding <span class="mute">Cloudflare Email Routing to Gmail</span></h1>
+
+  <div id="login" class="card" hidden>
+    <h2>Sign in</h2>
+    <div class="row">
+      <input id="pw" type="password" placeholder="Admin password" class="grow">
+      <button id="loginBtn">Sign in</button>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <div class="card">
+      <h2>1. Destination inbox</h2>
+      <p class="mute">Cloudflare must verify this address once. Click the link in the email it sends.</p>
+      <div class="row">
+        <input id="dest" type="email" class="grow" placeholder="abcd@gmail.com">
+        <button id="addDest">Add / re-send verification</button>
+      </div>
+      <div id="destList"></div>
+    </div>
+
+    <div class="card">
+      <h2>2. Domain</h2>
+      <div class="row">
+        <select id="zone" class="grow"></select>
+        <button id="enable">Enable Email Routing</button>
+      </div>
+      <div id="status" class="mute"></div>
+    </div>
+
+    <div id="zoneArea" hidden>
+      <div class="card">
+        <h2>3. Catch-all</h2>
+        <p class="mute">Forward every address on the domain to your destination.</p>
+        <div class="row between">
+          <span id="catchState"></span>
+          <button id="toggleCatch">Toggle</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>4. Aliases</h2>
+        <div class="row">
+          <input id="alias" class="grow" placeholder="hello">
+          <span id="atDomain" class="mute"></span>
+          <button id="addAlias">Add alias</button>
+        </div>
+        <div id="rules"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

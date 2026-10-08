@@ -1,0 +1,17 @@
+name = "gmail-cloudflare"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[vars]
+# Gmail address that receives forwarded mail (can be changed in the dashboard too)
+DEFAULT_DESTINATION = "abcd@gmail.com"
+
+# Secrets (set with `wrangler secret put <NAME>`):
+#   ADMIN_PASSWORD      - password for the dashboard and the Gmail extension
+#   CF_API_TOKEN        - Cloudflare API token (see README for permissions)
+#   RESEND_API_KEY      - optional, only needed for sending from your domain
