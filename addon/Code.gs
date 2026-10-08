@@ -82,14 +82,21 @@ function createDomainLabel(domain, index) {
   }
 }
 
+const LABEL_RULES_VERSION = "2";
+const domainQuery = (domain) => "{to:@" + domain + " from:@" + domain + "}";
+
+// Mail to the domain arrives by forwarding; mail from it (our own sends, replies to them) arrives directly.
 function ensureDomainFilter(domain, labelId, filters) {
-  const query = "to:@" + domain;
+  const query = domainQuery(domain);
+  filters
+    .filter((filter) => filter.criteria && filter.criteria.query === "to:@" + domain && (filter.action.addLabelIds || []).indexOf(labelId) >= 0)
+    .forEach((filter) => Gmail.Users.Settings.Filters.remove("me", filter.id));
   const exists = filters.some((filter) => filter.criteria && filter.criteria.query === query && (filter.action.addLabelIds || []).indexOf(labelId) >= 0);
   if (!exists) Gmail.Users.Settings.Filters.create({ criteria: { query }, action: { addLabelIds: [labelId] } }, "me");
 }
 
 function labelExistingMail(domain, labelId) {
-  const found = Gmail.Users.Messages.list("me", { q: "to:@" + domain + " OR from:@" + domain, maxResults: BACKFILL_LIMIT });
+  const found = Gmail.Users.Messages.list("me", { q: domainQuery(domain), maxResults: BACKFILL_LIMIT });
   const ids = ((found || {}).messages || []).map((message) => message.id);
   if (ids.length) Gmail.Users.Messages.batchModify({ ids, addLabelIds: [labelId] }, "me");
 }
@@ -107,7 +114,7 @@ function setupDomainLabels(domains) {
       ensureDomainFilter(domain, label.id, filters);
       labelExistingMail(domain, label.id);
     });
-    props().setProperty("DOMAIN_LABELS", JSON.stringify(ids));
+    props().setProperties({ DOMAIN_LABELS: JSON.stringify(ids), LABEL_RULES: LABEL_RULES_VERSION });
     props().deleteProperty("LABEL_ERROR");
     return null;
   } catch (error) {
@@ -120,6 +127,7 @@ function setupDomainLabels(domains) {
 
 function labelsNeedSetup(domains) {
   if (props().getProperty("LABEL_ERROR") === PERMISSION_ERROR) return false;
+  if (domains && props().getProperty("LABEL_RULES") !== LABEL_RULES_VERSION) return true;
   return Boolean(domains) && Object.keys(domainLabelIds()).sort().join(",") !== domains.slice().sort().join(",");
 }
 
