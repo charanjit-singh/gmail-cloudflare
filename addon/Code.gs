@@ -11,7 +11,7 @@ function onHome() {
 // Runs immediately on click, no side panel card.
 function sendDraft(e) {
   const draft = GmailApp.getDrafts().sort((x, y) => y.getMessage().getDate() - x.getMessage().getDate())[0];
-  if (!draft) return notify("No draft found. Wait for Gmail to auto-save, then try again.");
+  if (!draft) return resultCard("No draft found. Wait for Gmail to auto-save, then try again.");
   const m = draft.getMessage();
   const err = post({
     to: list(m.getTo()),
@@ -25,9 +25,15 @@ function sendDraft(e) {
       content: Utilities.base64Encode(a.getBytes()),
     })),
   });
-  if (err) return notify("Send failed: " + err);
+  if (err) return resultCard("Send failed: " + err);
   draft.deleteDraft();
-  return notify("Sent from " + props().getProperty("FROM_ADDRESS"), true);
+  return resultCard("Sent from " + props().getProperty("FROM_ADDRESS"));
+}
+
+function resultCard(text) {
+  return CardService.newCardBuilder()
+    .addSection(CardService.newCardSection().addWidget(CardService.newTextParagraph().setText(text)))
+    .build();
 }
 
 // Opened on a message: reply to the sender from the alias.
