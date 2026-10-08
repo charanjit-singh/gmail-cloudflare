@@ -1,6 +1,8 @@
 import { api, escapeHtml, identitiesFrom, loadSettings } from "./shared.js";
 
 const SEND_BUTTON = 'div[role="button"][data-tooltip^="Send"]';
+// Gmail's tooltip is "Send" or "Send (⌘Enter)". Add-on icons such as "Send as alias" also start with "Send".
+const isGmailSend = (element) => /^Send(\s*[(\u202a]|$)/.test(element.getAttribute("data-tooltip") || "");
 const BODY = 'div[aria-label="Message Body"], div[g_editable="true"]';
 const MORE_SEND_OPTIONS = '[aria-label^="More send options"], [data-tooltip^="More send options"]';
 const DISCARD = '[aria-label^="Discard draft"], [data-tooltip^="Discard draft"]';
@@ -23,7 +25,7 @@ export function registerComposeButton() {
 }
 
 function addButtons() {
-  document.querySelectorAll(SEND_BUTTON).forEach((send) => {
+  [...document.querySelectorAll(SEND_BUTTON)].filter(isGmailSend).forEach((send) => {
     const toolbar = send.closest("td") || send.parentElement;
     if (!toolbar || toolbar.querySelector(`[${MARK}]`)) return;
     const button = document.createElement("div");
