@@ -1,0 +1,29 @@
+extension/src/compose-button.js
+  s_83d40e3169d15c::t_b5d35bd6503d46 74,76-77,122-123,147-151
+extension/static/manifest.json
+  s_d40147a7cbf469::t_7682e82497a319 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d0a2939b1dd397094f783021be08d09f71f08be3",
+  "prompts": {},
+  "sessions": {
+    "s_83d40e3169d15c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2cc0a7f7-b546-4fa0-8384-11de8fc93bff",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    },
+    "s_d40147a7cbf469": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad1201fa-f823-47fc-940f-1315c4e35e45",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Charanjit Singh <charanjitdotsingh@gmail.com>"
+    }
+  }
+}
