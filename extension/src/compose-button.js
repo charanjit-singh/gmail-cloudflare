@@ -2,6 +2,7 @@ import { api, escapeHtml, identitiesFrom, loadSettings } from "./shared.js";
 
 const SEND_BUTTON = 'div[role="button"][data-tooltip^="Send"]';
 const BODY = 'div[aria-label="Message Body"], div[g_editable="true"]';
+const MORE_SEND_OPTIONS = '[aria-label^="More send options"], [data-tooltip^="More send options"]';
 const DISCARD = '[aria-label^="Discard draft"], [data-tooltip^="Discard draft"]';
 const ATTACHMENT_CHIP = ".aZo, .dL";
 const EMAIL_PATTERN = /[^\s<>,;"]+@[^\s<>,;"]+/;
@@ -33,8 +34,17 @@ function addButtons() {
     button.style.cssText =
       "display:inline-block;margin-left:8px;padding:0 14px;height:36px;line-height:36px;border-radius:18px;background:#e8f0fe;color:#1a73e8;font:500 14px system-ui,sans-serif;cursor:pointer;user-select:none;vertical-align:middle";
     button.addEventListener("click", () => openPicker(button, composeRootOf(send)));
-    send.after(button);
+    sendControl(send, toolbar).after(button);
   });
+}
+
+// Gmail's Send is a split button: Send plus a dropdown arrow. Climb until both are inside, so we land after the pair.
+function sendControl(send, toolbar) {
+  let control = send;
+  while (!control.querySelector(MORE_SEND_OPTIONS) && control.parentElement && control.parentElement !== toolbar) {
+    control = control.parentElement;
+  }
+  return control;
 }
 
 const composeRootOf = (send) => send.closest('div[role="dialog"]') || send.closest("form") || send.closest(".M9, .iN, .nH");
