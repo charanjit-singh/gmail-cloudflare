@@ -37,11 +37,13 @@ const headerValue = (message, name) =>
 export async function threadContext(threadId) {
   if (!canSaveToGmail()) return { canSaveToGmail: false };
   if (!threadId) return { canSaveToGmail: true };
-  const thread = await gmail(`threads/${threadId}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`);
+  const headers = ["Message-ID", "References", "From", "Reply-To"].map((name) => "metadataHeaders=" + name).join("&");
+  const thread = await gmail(`threads/${threadId}?format=metadata&${headers}`);
   const last = thread.messages?.[thread.messages.length - 1];
   const inReplyTo = last ? headerValue(last, "Message-ID") : "";
   const references = [last ? headerValue(last, "References") : "", inReplyTo].join(" ").trim();
-  return { canSaveToGmail: true, threadId, inReplyTo, references };
+  const replyTo = last ? (headerValue(last, "Reply-To") || headerValue(last, "From")).match(/[^\s<>,;"]+@[^\s<>,;"]+/) : null;
+  return { canSaveToGmail: true, threadId, inReplyTo, references, replyRecipients: replyTo ? [replyTo[0]] : [] };
 }
 
 function base64(text) {

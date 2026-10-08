@@ -149,7 +149,21 @@ function emailsOf(root, name) {
   const fromChips = [...root.querySelectorAll(`[name="${name}"] :is(${CHIP})`)].map(chipEmail);
   const found = [...fromInputs, ...fromChips].filter(Boolean);
   if (found.length || name !== "to") return [...new Set(found)];
-  return [...new Set(recipientChipsOutsideCopies(root).map(chipEmail).filter(Boolean))];
+  const chips = recipientChipsOutsideCopies(root).map(chipEmail).filter(Boolean);
+  return [...new Set(chips.length ? chips : addressesShownInHeader(root))];
+}
+
+// A collapsed in-thread reply shows its recipients as plain text above the body.
+function addressesShownInHeader(root) {
+  const body = root.querySelector(BODY);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const found = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (body?.contains(node) || node.parentElement?.closest(".gmail_quote, [data-alias-button]")) continue;
+    if (/^\s*from\b/i.test(node.parentElement?.closest("tr, div")?.textContent || "")) continue;
+    found.push(...(node.textContent.match(new RegExp(EMAIL_PATTERN.source, "g")) || []));
+  }
+  return found;
 }
 
 function recipientChipsOutsideCopies(root) {
@@ -193,12 +207,16 @@ function threadIdOf(root) {
 
 async function send(split, root, account) {
   if (split.getAttribute("aria-busy") === "true") return;
-  const draft = readDraft(root);
-  const problem = problemWith(draft);
-  if (problem) return snackbar(problem);
   setBusy(split, true);
   const threadId = threadIdOf(root);
   const context = (await chrome.runtime.sendMessage({ type: "thread-context", threadId })) || {};
+  const draft = readDraft(root);
+  if (!draft.to.length && context.replyRecipients?.length) draft.to = context.replyRecipients;
+  const problem = problemWith(draft);
+  if (problem) {
+    setBusy(split, false);
+    return snackbar(problem);
+  }
   const { hasAttachments, ...message } = draft;
   const outgoing = { from: account.value, ...message, inReplyTo: context.inReplyTo, references: context.references };
   const result = await api("/send", "POST", { ...outgoing, copyToInbox: !context.canSaveToGmail });
