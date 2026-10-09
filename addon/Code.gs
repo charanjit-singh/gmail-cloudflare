@@ -419,6 +419,7 @@ function settingsCard() {
   const card = CardService.newCardBuilder().setHeader(header("Settings", "Send as alias")).addSection(connectionSection(synced));
   if (!synced.error) accountSections(synced.accounts).forEach((section) => card.addSection(section));
   if (!synced.error) card.addSection(labelsSection(synced.receivingDomains || []));
+  card.addSection(deliverySection());
   const footer = CardService.newFixedFooter().setPrimaryButton(
     CardService.newTextButton().setText("Manage accounts").setTextButtonStyle(CardService.TextButtonStyle.FILLED)
       .setOpenLink(CardService.newOpenLink().setUrl(p.getProperty("WORKER_URL")))
@@ -474,6 +475,45 @@ function labelsSection(domains) {
     );
   });
   return section;
+}
+
+// Lists anywhere this Gmail sends copies onward: auto-forwarding and filters that forward.
+function forwardingTargets() {
+  const targets = [];
+  const auto = Gmail.Users.Settings.getAutoForwarding("me") || {};
+  if (auto.enabled) targets.push({ where: "Auto-forwarding (Settings > Forwarding)", to: auto.emailAddress });
+  const filters = (Gmail.Users.Settings.Filters.list("me") || {}).filter || [];
+  filters
+    .filter((filter) => filter.action && filter.action.forward)
+    .forEach((filter) => targets.push({ where: "Filter: " + JSON.stringify(filter.criteria || {}), to: filter.action.forward }));
+  return targets;
+}
+
+function deliverySection() {
+  const section = CardService.newCardSection().setHeader("Delivery check");
+  try {
+    const targets = forwardingTargets();
+    if (!targets.length) {
+      return section.addWidget(
+        CardService.newDecoratedText().setText("Nothing forwards elsewhere").setBottomLabel("Mail stays in this Gmail").setStartIcon(materialIcon("verified"))
+      );
+    }
+    targets.forEach((target) => {
+      section.addWidget(
+        CardService.newDecoratedText().setText("Forwards to " + plain(target.to)).setBottomLabel(plain(target.where)).setStartIcon(materialIcon("warning")).setWrapText(true)
+      );
+    });
+    return section.addWidget(note("Turn these off in Gmail Settings > Forwarding and POP/IMAP, and Filters and Blocked Addresses."));
+  } catch (error) {
+    console.error("Delivery check failed: " + error);
+    return section.addWidget(note("Couldn't check forwarding: " + plain(String(error.message || error))));
+  }
+}
+
+// Run from the Apps Script editor to print the same delivery check to the log.
+function checkDelivery() {
+  const targets = forwardingTargets();
+  console.log(targets.length ? JSON.stringify(targets, null, 2) : "Nothing forwards elsewhere.");
 }
 
 function allowLabelAccess() {
