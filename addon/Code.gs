@@ -26,8 +26,6 @@ function identities() {
   return lines(p.FROM_ADDRESSES || p.FROM_ADDRESS).map(parseIdentity).filter(Boolean);
 }
 
-const labelFor = (value) => (parseIdentity(value) || { label: value }).label;
-
 // Calls the Worker. Returns { status, body }, with status 0 when it cannot be reached.
 function workerRequest(method, path, body) {
   const p = props().getProperties();
@@ -131,11 +129,14 @@ function labelsNeedSetup(domains) {
   return Boolean(domains) && Object.keys(domainLabelIds()).sort().join(",") !== domains.slice().sort().join(",");
 }
 
-function chosenFrom(formInput) {
-  const from = (formInput.from || "").trim() || (identities()[0] || {}).value;
-  if (from) props().setProperty("LAST_FROM", from);
-  return from;
+// The account the next send uses: the last one picked, or the first in the list.
+function currentAccount() {
+  const accounts = identities();
+  const last = props().getProperty("LAST_FROM");
+  return accounts.find((account) => account.value === last) || accounts[0] || null;
 }
+
+const accountName = (account) => account.label.split(" · ")[0];
 
 // ---------- Building blocks ----------
 
@@ -161,16 +162,6 @@ function notify(text, pop) {
   return response.build();
 }
 
-function fromDropdown(selected) {
-  const chosen = selected || props().getProperty("LAST_FROM");
-  const dropdown = CardService.newSelectionInput()
-    .setType(CardService.SelectionInputType.DROPDOWN)
-    .setFieldName("from")
-    .setTitle("Send from");
-  identities().forEach((identity) => dropdown.addItem(identity.label, identity.value, identity.value === chosen));
-  return dropdown;
-}
-
 function header(title, subtitle) {
   const built = CardService.newCardHeader().setTitle(title).setImageUrl(LOGO_URL);
   return subtitle ? built.setSubtitle(subtitle) : built;
@@ -181,7 +172,7 @@ function resultCard(title, detail, ok) {
     .setText("<b>" + plain(title) + "</b>")
     .setBottomLabel(plain(detail))
     .setWrapText(true)
-    .setStartIcon(icon(ok ? "CONFIRMATION_NUMBER_ICON" : "DESCRIPTION"));
+    .setStartIcon(materialIcon(ok ? "check_circle" : "error"));
   return CardService.newCardBuilder().addSection(CardService.newCardSection().addWidget(row)).build();
 }
 
@@ -189,7 +180,7 @@ function resultCard(title, detail, ok) {
 
 function onHome() {
   syncAccounts();
-  return props().getProperty("WORKER_URL") && identities().length ? composeCard({}) : settingsCard();
+  return props().getProperty("WORKER_URL") && currentAccount() ? composeCard({}) : settingsCard();
 }
 
 // Opened on a message: reply to the sender from one of your addresses.
@@ -198,49 +189,103 @@ function onMessage(e) {
   GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
   const message = GmailApp.getMessageById(e.gmail.messageId);
   const subject = message.getSubject();
-  return composeCard(
-    {
-      to: message.getReplyTo() || message.getFrom(),
-      subject: /^re:/i.test(subject) ? subject : "Re: " + subject,
-    },
-    "Replying to " + message.getFrom()
-  );
+  if (!currentAccount()) return settingsCard();
+  return composeCard({
+    to: message.getReplyTo() || message.getFrom(),
+    subject: /^re:/i.test(subject) ? subject : "Re: " + subject,
+    context: "Replying to " + message.getFrom(),
+  });
 }
 
 // ---------- Side panel: compose ----------
 
-function composeCard(values, context) {
-  const sender = CardService.newCardSection().setHeader(context || "New message").addWidget(fromDropdown());
-  const recipients = CardService.newCardSection()
-    .addWidget(textInput("to", "To", values.to))
-    .addWidget(textInput("subject", "Subject", values.subject));
-  const copy = CardService.newCardSection()
-    .setHeader("Cc")
-    .setCollapsible(true)
-    .setNumUncollapsibleWidgets(0)
-    .addWidget(textInput("cc", "Cc", values.cc));
-  const body = CardService.newCardSection().addWidget(textInput("body", "Message", values.body, true));
-  const footer = CardService.newFixedFooter()
-    .setPrimaryButton(filledButton("Send", action("send")))
-    .setSecondaryButton(textButton("Settings", action("openSettings")));
-  return CardService.newCardBuilder()
-    .setHeader(header("Send as alias", identities().length + " address" + (identities().length === 1 ? "" : "es")))
-    .addSection(sender)
-    .addSection(recipients)
-    .addSection(copy)
-    .addSection(body)
+const FORM_FIELDS = ["to", "cc", "subject", "body", "context", "showCc"];
+const formValues = (e) => FORM_FIELDS.reduce((values, field) => Object.assign(values, { [field]: (e.formInput || {})[field] || (e.parameters || {})[field] || "" }), {});
+
+function senderSection(values) {
+  const account = currentAccount();
+  const row = CardService.newDecoratedText()
+    .setTopLabel("Send as")
+    .setText(plain(accountName(account)))
+    .setBottomLabel(plain(account.email))
+    .setStartIcon(materialIcon("account_circle"))
+    .setButton(CardService.newTextButton().setText("Change").setOnClickAction(action("openAccountPicker", values)));
+  const section = CardService.newCardSection().addWidget(row);
+  if (values.context) section.addWidget(CardService.newDecoratedText().setText(plain(values.context)).setStartIcon(materialIcon("reply")).setWrapText(true));
+  return section;
+}
+
+function messageSection(values) {
+  const section = CardService.newCardSection().addWidget(textInput("to", "To", values.to));
+  if (values.showCc || values.cc) section.addWidget(textInput("cc", "Cc", values.cc));
+  else section.addWidget(CardService.newTextButton().setText("Add Cc").setOnClickAction(action("showCc", Object.assign({}, values, { showCc: "1" }))));
+  return section.addWidget(textInput("subject", "Subject", values.subject)).addWidget(textInput("body", "Message", values.body, true));
+}
+
+function composeCard(values) {
+  const account = currentAccount();
+  const footer = CardService.newFixedFooter().setPrimaryButton(filledButton("Send as " + plain(accountName(account)), action("send", { context: values.context || "" })));
+  const card = CardService.newCardBuilder()
+    .addSection(senderSection(values))
+    .addSection(messageSection(values))
     .setFixedFooter(footer)
+    .addCardAction(CardService.newCardAction().setText("Settings").setOnClickAction(action("openSettings")));
+  const workerUrl = props().getProperty("WORKER_URL");
+  if (workerUrl) card.addCardAction(CardService.newCardAction().setText("Sent mail").setOpenLink(CardService.newOpenLink().setUrl(workerUrl)));
+  return card.build();
+}
+
+function showCc(e) {
+  return showCard(composeCard(Object.assign(formValues(e), { showCc: "1" })));
+}
+
+function openAccountPicker(e) {
+  const values = formValues(e);
+  const current = currentAccount();
+  const picker = CardService.newCardSection();
+  identities().forEach((account) => {
+    const row = CardService.newDecoratedText()
+      .setText(plain(accountName(account)))
+      .setBottomLabel(plain(account.email))
+      .setStartIcon(materialIcon("account_circle"))
+      .setOnClickAction(action("pickAccount", Object.assign({}, values, { from: account.value })));
+    if (current && account.value === current.value) row.setEndIcon(materialIcon("check"));
+    picker.addWidget(row);
+  });
+  return pushCard(CardService.newCardBuilder().setHeader(CardService.newCardHeader().setTitle("Send as")).addSection(picker).build());
+}
+
+function pickAccount(e) {
+  props().setProperty("LAST_FROM", e.parameters.from);
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().popCard().updateCard(composeCard(formValues(e))))
     .build();
 }
 
+function sentCard(account, to, copyError) {
+  const row = CardService.newDecoratedText()
+    .setText("<b>Sent!</b>")
+    .setBottomLabel(plain("From " + account.email + " to " + to.join(", ")))
+    .setWrapText(true)
+    .setStartIcon(materialIcon("check_circle"));
+  const section = CardService.newCardSection().addWidget(row);
+  if (copyError) section.addWidget(note("Not copied to Gmail Sent: " + plain(copyError)));
+  section.addWidget(filledButton("New message", action("newMessage")));
+  return CardService.newCardBuilder().addSection(section).build();
+}
+
+function newMessage() {
+  return showCard(composeCard({}));
+}
+
 function send(e) {
-  const form = e.formInput;
-  const from = chosenFrom(form);
+  const form = e.formInput || {};
+  const account = currentAccount();
   const payload = { to: list(form.to), cc: list(form.cc), subject: form.subject || "", text: form.body || "" };
-  const result = post(from, payload);
-  if (result.error) return notify("Send failed: " + result.error);
-  const copyError = saveSentCopy(buildRaw(from, payload, result.messageId), from);
-  return notify(copyError ? "Sent, but not copied to Sent: " + copyError : "Sent!", true);
+  const result = post(account.value, payload);
+  if (result.error) return notify(result.error);
+  const copyError = saveSentCopy(buildRaw(account.value, payload, result.messageId), account.value);
+  return showCard(sentCard(account, payload.to, copyError));
 }
 
 // ---------- Compose window ----------
@@ -258,25 +303,21 @@ function sendDraft() {
 
 function accountPickerCard(draft, accounts) {
   const message = draft.getMessage();
-  const last = props().getProperty("LAST_FROM");
-  const ordered = accounts.slice().sort((x, y) => (y.value === last) - (x.value === last));
+  const current = currentAccount();
   const summary = CardService.newCardSection()
-    .addWidget(CardService.newDecoratedText().setTopLabel("To").setText(plain(message.getTo()) || "No recipient").setWrapText(true))
-    .addWidget(CardService.newDecoratedText().setTopLabel("Subject").setText(plain(message.getSubject()) || "No subject").setWrapText(true));
-  const picker = CardService.newCardSection().setHeader("Send from");
-  ordered.forEach((account) => {
-    picker.addWidget(
-      CardService.newDecoratedText()
-        .setText(plain(account.label))
-        .setStartIcon(icon("EMAIL"))
-        .setOnClickAction(action("sendDraftFrom", { draftId: draft.getId(), from: account.value }))
-    );
+    .addWidget(CardService.newDecoratedText().setTopLabel("To").setText(plain(message.getTo()) || "No recipient").setStartIcon(materialIcon("person")).setWrapText(true))
+    .addWidget(CardService.newDecoratedText().setTopLabel("Subject").setText(plain(message.getSubject()) || "No subject").setStartIcon(materialIcon("subject")).setWrapText(true));
+  const picker = CardService.newCardSection().setHeader("Tap an account to send");
+  accounts.forEach((account) => {
+    const row = CardService.newDecoratedText()
+      .setText(plain(accountName(account)))
+      .setBottomLabel(plain(account.email))
+      .setStartIcon(materialIcon("account_circle"))
+      .setOnClickAction(action("sendDraftFrom", { draftId: draft.getId(), from: account.value }));
+    if (current && account.value === current.value) row.setEndIcon(materialIcon("check"));
+    picker.addWidget(row);
   });
-  return CardService.newCardBuilder()
-    .setHeader(header("Which account?", "Tap one to send"))
-    .addSection(summary)
-    .addSection(picker)
-    .build();
+  return CardService.newCardBuilder().setHeader(CardService.newCardHeader().setTitle("Send as")).addSection(summary).addSection(picker).build();
 }
 
 function sendDraftFrom(e) {
@@ -303,8 +344,8 @@ function deliverDraft(draft, from) {
   if (result.error) return resultCard("Could not send", result.error, false);
   const copyError = saveSentCopy(rawWithSender(message.getRawContent(), from, result.messageId), from);
   draft.deleteDraft();
-  const detail = "From " + labelFor(from) + "\nTo " + (message.getTo() || "recipient");
-  return resultCard("Sent!", copyError ? detail + "\nNot copied to Sent: " + copyError : detail, true);
+  const detail = "From " + (parseIdentity(from) || { email: from }).email + " to " + (message.getTo() || "recipient");
+  return resultCard("Sent!", copyError ? detail + ". Not copied to Gmail Sent: " + copyError : detail, true);
 }
 
 // ---------- Sent copy ----------
